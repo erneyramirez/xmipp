@@ -42,14 +42,14 @@
 //@{
 
 /** Angular Assignment mag parameters. */
-class ProgAngularAssignmentMag: public XmippProgram
+class ProgAngularAssignmentMag: public XmippMetadataProgram
 {
 public:
     /** Filenames */
-    FileName fnIn, fnDir, fnSym, fnRef;
+    FileName fnIn, fnOut, fnDir, fnSym, fnRef;
 public: // Internal members
     // Metadata with input images and input volumes
-    MetaData mdIn, mdRef;
+    MetaData mdIn, mdRef, mdOut;
 
     // vector of reference images
     std::vector< MultidimArray<double> > vecMDaRef;
@@ -72,7 +72,43 @@ public: // Internal members
     MultidimArray<double> axTx;
     MultidimArray<double> axTy;
 
+    // CCV result matrix
+    MultidimArray<double>                   ccMatrixRot;
+    MultidimArray<double>                   ccVectorRot;
+    std::vector<double>                     cand; // rotation candidates
+    int                                     peaksFound = 0; // peaksFound in ccVectorRot
+    double                                  tempCoeff;
+
+    size_t idxOut; // index for metadata output file
+
+    int testCounter = 0;
+
+    // candidates for each loop
+    std::vector<unsigned int>               candidatesFirstLoop;
+    std::vector<unsigned int>               Idx;
+    std::vector<double>                     candidatesFirstLoopCoeff;
+    std::vector<double>                     bestTx;
+    std::vector<double>                     bestTy;
+    std::vector<double>                     bestRot;
+
+    // some constants
+    int sizeMdRef;
+    // some constants
+    size_t n_bands;
+    size_t startBand;
+    size_t finalBand;
+    size_t n_rad;
+    size_t n_ang;
+    size_t n_ang2;
+
+
 public:
+    // constructor
+    ProgAngularAssignmentMag();
+
+    // destructor
+    ~ProgAngularAssignmentMag();
+
     /// Read arguments from command line
     void defineParams();
     void readParams();
@@ -81,10 +117,23 @@ public:
     void show();
 
     /** Run. */
-    void run();
+//    void run();
+
+    /*startProcessing() por qué es importante?*/
+    void startProcessing();
+
+    /*  */
 
     /// Produce side info: fill arrays with relevant transformation matrices
-    void produceSideinfo();
+    void preProcess();
+
+    /*void processImage()
+    *
+    */
+    void processImage(const FileName &fnImg, const FileName &fnImgOut, const MDRow &rowIn, MDRow &rowOut);
+
+    /* void postProcess(), quizá sea para escribir los datos de salida*/
+    void postProcess();
 
 private:
     void printSomeValues(MultidimArray<double> & MDa);
@@ -96,10 +145,10 @@ private:
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
     void _getComplexMagnitude(MultidimArray<std::complex<double> > &FourierData, MultidimArray<double> &FourierMag);
-    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, const size_t &rad, const size_t &ang);
+    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, const size_t &startBand, const size_t &finalBand, const size_t &n_bands, const size_t &rad, const size_t &ang);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
-    void ccMatrix(MultidimArray<std::complex<double> > F1, MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
+    void ccMatrix(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
     void selectBands(MultidimArray<double> &in, MultidimArray<double> &out, const size_t &n_bands, const size_t &startBand, const size_t &n_ang);
     void maxByColumn(MultidimArray<double> &in, MultidimArray<double> &out, const size_t &nFil, const size_t &nCol);
     void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size, int *nPeaksFound);
@@ -112,121 +161,18 @@ private:
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void bestCand2(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
     void _applyRotationAndShift(MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
+    void rotCandidates2(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
+    void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
+    void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
+    void halfFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
+    MultidimArray<double> imToPolar2(MultidimArray<double> &cartIm, const size_t &rad, const size_t &ang);
+    void rotCandidates3(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
+    void fast_correlation_vector2(MultidimArray<std::complex<double> > FFT1, const MultidimArray<std::complex<double> > FFT2, MultidimArray< double >& R, FourierTransformer &transformer);
+
+    void _applyCircularMask(const MultidimArray<double> &in, MultidimArray<double> &out);
+    void newApplyGeometry(MultidimArray<double> &in, MultidimArray<double> &out, const double &a, const double &b, const double &c, const double &d, const double &tx, const double &ty);
 };
 //@}
 
-
-
-//            // test  write MdaRef
-//            _writeTestFile(MDaRef,"/home/jeison/Escritorio/t_ref.txt");
-
-//            // test fftw and magnitude
-//            MultidimArray< std::complex<double> > MDaRef_fourier(Ydim, Xdim);
-//            _applyFourier(MDaRef, MDaRef_fourier);
-//            MultidimArray<double> MDaRef_fourier_mag(Ydim, Xdim);
-//            _getComplexMagnitude(MDaRef_fourier,MDaRef_fourier_mag);
-//            _writeTestFile(MDaRef_fourier_mag,"/home/jeison/Escritorio/t_mag.txt");
-
-            // test  write MDaRef after fourier
-            // supongo que no tengo problema porque genero todo el espectro
-            // genero una copia y se supone que así es más lento
-//            _writeTestFile(MDaRef,"/home/jeison/Escritorio/t_refAterFourier.txt");
-
-//            // test magnitude fourier shift
-//            MultidimArray< double > MDaRef_fourier_mag_shifted(Ydim, Xdim);
-//            completeFourierShift(MDaRef_fourier_mag, MDaRef_fourier_mag_shifted);
-//            _writeTestFile(MDaRef_fourier_mag_shifted,"/home/jeison/Escritorio/t_magShifted.txt");
-
-//            // test imTopolar
-//            const size_t n_rad = size_t(Xdim/2 + 0.5);
-//            const size_t n_ang = size_t(360);
-//            MultidimArray<double> MDaRef_polar(n_rad,n_ang);
-//            MDaRef_polar = imToPolar(MDaRef, n_rad, n_ang);
-//            // test write output
-//            _writeTestFile(MDaRef_polar,"/home/jeison/Escritorio/t_polar.txt", n_rad, n_ang);
-
-//            // pearson test
-//            double coeff;
-//            pearsonCorr(MDaIn, MDaRef,coeff);
-//            std::cout << "coeff: " << coeff << std::endl;
-
-//                // test de organización
-//                int ints[] = {0,1,2,3,4,5};
-//                std::vector<int> idx(ints,ints + sizeof(ints)/sizeof(int));
-//                double ints2[] = {1.3,2.5,5.2,8.3,16.6,4.3};
-//                std::vector<double> Ordidx(ints2,ints2 + sizeof(ints2)/sizeof(double));
-//                std::cout << "before order\n";
-//                for(int k = 0; k < 6; k++)
-//                    std::cout << "idx("<<k<<")= "<<idx[k]<<"\t OrdIdx("<<k<<")= "<<Ordidx[k]<<std::endl;
-//                std::partial_sort(idx.begin(), idx.begin()+3, idx.end(), [&](int i, int j){return ints2[i] > ints2[j]; });
-//                std::cout << "after partial order\n";
-//                for(int k = 0; k < 6; k++)
-//                    std::cout << "idx("<<k<<")= "<<idx[k]<<"\t OrdIdx("<<k<<")= "<<Ordidx[k]<<std::endl;
-
-
-
-//        // show first loop results
-//        //std::cout << "input image " << countInImg + 1 << ", direction candidates: \n";
-//        outfile << "size of IdxVector underwent to sorting: " << Idx.size() << "\n";
-//        outfile << "input image " << countInImg + 1 << ", direction candidates: \n";
-
-//        for(int i = 0; i < nCand; i++)
-//            outfile   << "dir:  "          << candidatesFirstLoop[ Idx[i] ]
-//                      << "\t    coef:  "    << candidatesFirstLoopCoeff[Idx[i]]
-//                      << "\t    rot:  "     << bestRot[Idx[i]]
-//                      << "\t    tx:  "      << bestTx[Idx[i]]
-//                      << "\t    ty:  "      << bestTy[Idx[i]] << "\n";
-//        outfile << "\t \t real Rot/psi: "   << psiVal
-//                << "\t    realTx: "         << realTx
-//                << "\t    realTy: "         << realTy << "\n";
-//        outfile << "\n";
-// clean candidates
-//        std::vector<double>().swap(candidatesFirstLoopCoeff);
-//        std::vector<unsigned int>().swap(candidatesFirstLoop);
-
-//            // en el ciclo debo elegir los mejores candidatos (anterior)
-//            // antes de incluir partial_sort
-//            double thres = tempCoeff - 0.02; //before tempCoeff * (1. - 0.03); // 0.02 -- 0.01
-//            if(bestCoeff > thres){
-//                tempCoeff = bestCoeff;
-//                Idx.push_back(k++);
-//                candidatesFirstLoop.push_back(countRefImg+1);
-//                candidatesFirstLoopCoeff.push_back(bestCoeff);
-//                bestTx.push_back(Tx);
-//                bestTy.push_back(Ty);
-//                bestRot.push_back(bestCandVar);
-//            }
-
-//            // lectura de imagenes referencia dentro del primer ciclo
-//            mdRef.getRow(rowRef, size_t(countRefImg+1) /*iterRef->objId*/);
-//            rowRef.getValue(MDL_IMAGE, fnImgRef);
-//            // processing reference image
-//            ImgRef.read(fnImgRef);
-//            MDaRef = ImgRef();
-//            _applyFourier(MDaRef, MDaRefF);// fourier experimental image (genera copia?)
-//            _getComplexMagnitude(MDaRefF, MDaRefFM);// magnitude espectra experimental image
-//            completeFourierShift(MDaRefFM, MDaRefFMs);// shift spectrum
-//            MDaRefFMs_polar = imToPolar(MDaRefFMs, n_rad, n_ang);// polar representation of magnitude
-//            selectBands(MDaRefFMs_polar, MDaRefFMs_polarPart, n_bands, startBand, n_ang); // select bands
-//            _applyFourier(MDaRefFMs_polarPart,MDaRefFMs_polarF); // apply fourier
-
-//            // lectura de imágenes referencia en el segundo ciclo
-//            mdRef.getRow(rowRef, size_t(candidatesFirstLoop[ Idx[i] ]));
-//            rowRef.getValue(MDL_IMAGE, fnImgRef);
-//            // En lugar de hacer todo esto podria almacenar los candidatos a rotación del primer loop
-//            // processing reference image
-//            ImgRef.read(fnImgRef);
-//            MDaRef = ImgRef();
-//            // aplicar dicha rotación a la imagen referencia y volver a calcular rotación y traslación
-//            double rotVal = bestRot[ Idx[i] ];
-//            double trasXval = bestTx[ Idx[i] ];
-//            double trasYval = bestTy[ Idx[i] ];
-//            _applyRotationAndShift(MDaRef, rotVal, trasXval, trasYval, MDaRefTrans);
-//            _applyFourier(MDaRefTrans, MDaRefF);// fourier experimental image (genera copia?)
-//            _getComplexMagnitude(MDaRefF, MDaRefFM);// magnitude espectra experimental image
-//            completeFourierShift(MDaRefFM, MDaRefFMs);// shift spectrum
-//            MDaRefFMs_polar = imToPolar(MDaRefFMs, n_rad, n_ang);// polar representation of magnitude
-//            selectBands(MDaRefFMs_polar, MDaRefFMs_polarPart, n_bands, startBand, n_ang); // select bands
-//            _applyFourier(MDaRefFMs_polarPart,MDaRefFMs_polarF); // apply fourier
 
 #endif
