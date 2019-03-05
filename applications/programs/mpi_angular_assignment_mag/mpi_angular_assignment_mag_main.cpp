@@ -27,20 +27,28 @@
 #include <parallel/xmipp_mpi.h>
 #include <reconstruction/angular_assignment_mag.h>
 
+ /*
+#include <../parallel/xmipp_mpi.h>
+#include <../reconstruction/angular_assignment_mag.h> // */
+
 //CREATE_MPI_METADATA_PROGRAM(ProgAngularAssignmentMag, MpiProgAngularAssignmentMag)
 // /*
 class MpiProgAngularAssignmentMag: public ProgAngularAssignmentMag, public MpiMetadataProgram
 {
 public:
+    int Nsimul;
+
     void defineParams()
     {
         ProgAngularAssignmentMag::defineParams();
         MpiMetadataProgram::defineParams();
+        addParamsLine("  [--Nsimultaneous <N=1>]     : Number of simultaneous processes that can enter in preprocessing");
     }
     void readParams()
     {
         MpiMetadataProgram::readParams();
         ProgAngularAssignmentMag::readParams();
+        Nsimul = getIntParam("--Nsimultaneous");
     }
     void read(int argc, char **argv, bool reportErrors = true)
     {
@@ -48,11 +56,18 @@ public:
     }
     void preProcess()
     {
-        ProgAngularAssignmentMag::preProcess();
-        MetaData &p_mdIn = *getInputMd();
-        p_mdIn.addLabel(MDL_GATHER_ID);
-        p_mdIn.fillLinear(MDL_GATHER_ID,1,1);
-        createTaskDistributor(p_mdIn, blockSize);
+        int Nturns = (int)ceil(node->size/Nsimul);
+        int myTurn = (int)floor(node->rank/Nsimul);
+        for (int turn=0; turn<=Nturns; turn++)
+        {
+            if (turn==myTurn)
+                ProgAngularAssignmentMag::preProcess();
+            node->barrierWait();
+        }
+        MetaData &mdIn = *getInputMd();
+        mdIn.addLabel(MDL_GATHER_ID);
+        mdIn.fillLinear(MDL_GATHER_ID,1,1);
+        createTaskDistributor(mdIn, blockSize);
     }
     void startProcessing()
     {

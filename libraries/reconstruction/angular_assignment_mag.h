@@ -100,6 +100,7 @@ public: // Internal members
     size_t n_rad;
     size_t n_ang;
     size_t n_ang2;
+    double maxShift;
 
 
 public:
@@ -145,17 +146,17 @@ private:
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
     void _getComplexMagnitude(MultidimArray<std::complex<double> > &FourierData, MultidimArray<double> &FourierMag);
-    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, const size_t &startBand, const size_t &finalBand, const size_t &n_bands, const size_t &rad, const size_t &ang);
+    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     void ccMatrix(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
-    void selectBands(MultidimArray<double> &in, MultidimArray<double> &out, const size_t &n_bands, const size_t &startBand, const size_t &n_ang);
-    void maxByColumn(MultidimArray<double> &in, MultidimArray<double> &out, const size_t &nFil, const size_t &nCol);
+    void selectBands(MultidimArray<double> &in, MultidimArray<double> &out);
+    void maxByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
     void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size, int *nPeaksFound);
     void _delayAxes(const size_t &Ydim, const size_t &Xdim, const size_t &n_ang);
     void bestCand(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
     void _applyRotation(MultidimArray<double> &MDaRef, double &rot, MultidimArray<double> &MDaRefRot);
-    void maxByRow(MultidimArray<double> &in, MultidimArray<double> &out, const size_t &nFil, const size_t &nCol);
+    void maxByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void getShift(MultidimArray<double> &axis, MultidimArray<double> &ccVector, double &shift, const size_t &size);
     void _applyShift(MultidimArray<double> &MDaRef, double &tx, double &ty, MultidimArray<double> &MDaRefShift);
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
