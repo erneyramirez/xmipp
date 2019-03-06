@@ -199,7 +199,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot);
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
-        std::vector<double>().swap(cand); // cambiar cand a valor fijo de candidatos, siempre 4
+        std::vector<double>().swap(cand);
         rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound);
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
         // all the results are storaged for posterior partial_sort
@@ -667,9 +667,6 @@ void ProgAngularAssignmentMag::rotCandidates3(MultidimArray<double> &in,
 
     int maxAccepted = 2;
 
-    //    // ¿realmente pueden haber menos?
-    //    if ( cont < maxAccepted)
-    //        printf("\nsi puede encontrar menos!!\n"); // en efecto pueden haber menos y debe ser considerado ese caso
     maxAccepted = ( cont < maxAccepted) ? cont : maxAccepted;
 
     if(cont){
@@ -687,9 +684,10 @@ void ProgAngularAssignmentMag::rotCandidates3(MultidimArray<double> &in,
             cand[i] =  double( size - 1 )/2. - interpIdx;
             cand[i+maxAccepted] =(cand[i]>0) ? cand[i] + 180 : cand[i] - 180 ;
         }
+
     }
     else{
-        printf("\nno peaks found!\n");
+        printf("no peaks found!\n");
     }
 }
 
@@ -1026,8 +1024,8 @@ void ProgAngularAssignmentMag::getShift(MultidimArray<double> &axis,
     int idx;
     int i;
     for(i = 0; i < size; i++){
-        if(/*ccVector[i]*/ dAi(ccVector,i) > maxVal){
-            maxVal = dAi(ccVector,i);
+        if(dAi(ccVector,i) > maxVal){
+            maxVal = ccVector[i];
             idx = i;
         }
     }
