@@ -26,11 +26,11 @@
 #ifndef __ANGULAR_ASSIGNMENT_MAG_H
 #define __ANGULAR_ASSIGNMENT_MAG_H
 
-#include <../../xmippCore/core/xmipp_program.h>
-#include <../../xmippCore/core/xmipp_fftw.h>
-#include <../../xmippCore/core/metadata_extension.h>
-#include <../../xmippCore/core/multidim_array.h>
-#include <../../xmipp/libraries/data/mask.h>
+#include <xmippCore/core/xmipp_program.h>
+#include <xmippCore/core/xmipp_fftw.h>
+#include <xmippCore/core/metadata_extension.h>
+#include <xmippCore/core/multidim_array.h>
+#include <xmipp/libraries/data/mask.h>
 
 #include <vector>
 #include <fstream> // borrar luego
