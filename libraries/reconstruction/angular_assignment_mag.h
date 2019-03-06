@@ -33,7 +33,7 @@
 #include <xmipp/libraries/data/mask.h>
 
 #include <vector>
-#include <fstream> // borrar luego
+#include <fstream> 
 #include <ctime>
 
 
