@@ -97,6 +97,22 @@ public: // Internal members
 
     size_t idxOut; // index for metadata output file
 
+
+    // some constants
+    int sizeMdRef;
+    int sizeMdIn;
+    // some constants
+    size_t n_bands1, n_bands2, n_bands3;
+    size_t startBand,startBand2,startBand3;
+    size_t finalBand1, finalBand2, finalBand3;
+    //    size_t startBandRef;
+    //    size_t finalBandRef;
+    size_t n_rad;
+    size_t n_ang;
+    size_t n_ang2;
+    double maxShift;
+    double sampling;
+
     // candidates for each loop
     std::vector<unsigned int>               candidatesFirstLoop;
     std::vector<unsigned int>               Idx;
@@ -118,21 +134,6 @@ public: // Internal members
     std::vector<double>                     bestTx3;
     std::vector<double>                     bestTy3;
     std::vector<double>                     bestRot3;
-
-    // some constants
-    int sizeMdRef;
-    int sizeMdIn;
-    // some constants
-    size_t n_bands1, n_bands2, n_bands3;
-    size_t startBand,startBand2,startBand3;
-    size_t finalBand1, finalBand2, finalBand3;
-    //    size_t startBandRef;
-    //    size_t finalBandRef;
-    size_t n_rad;
-    size_t n_ang;
-    size_t n_ang2;
-    double maxShift;
-    double sampling;
 
 
 public:

@@ -116,7 +116,7 @@ void ProgAngularAssignmentMag::preProcess()
     // estos indices de inicio y parada van a ser los de los extremos
     //tercer conjunto de bandas
     startBand=size_t((sampling*Xdim)/40.);
-    finalBand3=size_t((sampling*Xdim)/7.);
+    finalBand3=size_t((sampling*Xdim)/16.); // este valor debe estar relacionado con el maxResolutionTarget del protocolo
     finalBand3=(finalBand3 >= n_rad) ? n_rad-1 : finalBand3;
     n_bands3=finalBand3-startBand;
 
