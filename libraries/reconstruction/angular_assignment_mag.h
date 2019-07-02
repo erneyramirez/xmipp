@@ -68,14 +68,19 @@ public: // Internal members
     // vector of Fourier of reference images
     std::vector< MultidimArray< std::complex<double> > > vecMDaRefF;
 
-    // vector of Fourier of polar representation of magnitude spectrum of reference images
-    std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF;
+    // vector of Fourier of polar representation of magnitude spectrum of reference images to different scale
+    std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF1;
+    std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF2;
+    std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF3;
 
     // Size of the images
     size_t Xdim, Ydim;
 
     // Transformer
     FourierTransformer transformerImage, transformerPolarImage;
+
+    // borrar esta variable
+    int cont;
 
 
     // "delay axes"
@@ -92,8 +97,6 @@ public: // Internal members
 
     size_t idxOut; // index for metadata output file
 
-    int testCounter = 0;
-
     // candidates for each loop
     std::vector<unsigned int>               candidatesFirstLoop;
     std::vector<unsigned int>               Idx;
@@ -102,13 +105,27 @@ public: // Internal members
     std::vector<double>                     bestTy;
     std::vector<double>                     bestRot;
 
+    std::vector<unsigned int>               candidatesSecondLoop;
+    std::vector<unsigned int>               Idx2;
+    std::vector<double>                     candidatesSecondLoopCoeff;
+    std::vector<double>                     bestTx2;
+    std::vector<double>                     bestTy2;
+    std::vector<double>                     bestRot2;
+
+    std::vector<unsigned int>               candidatesThirdLoop;
+    std::vector<unsigned int>               Idx3;
+    std::vector<double>                     candidatesThirdLoopCoeff;
+    std::vector<double>                     bestTx3;
+    std::vector<double>                     bestTy3;
+    std::vector<double>                     bestRot3;
+
     // some constants
     int sizeMdRef;
     int sizeMdIn;
     // some constants
-    size_t n_bands;
-    size_t startBand;
-    size_t finalBand;
+    size_t n_bands1, n_bands2, n_bands3;
+    size_t startBand,startBand2,startBand3;
+    size_t finalBand1, finalBand2, finalBand3;
     //    size_t startBandRef;
     //    size_t finalBandRef;
     size_t n_rad;
@@ -161,7 +178,7 @@ private:
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
     void _getComplexMagnitude(MultidimArray<std::complex<double> > &FourierData, MultidimArray<double> &FourierMag);
-    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm,size_t &startBand,size_t &finalBand);
+    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, size_t &startBand, size_t &finalBand, size_t &n_bands);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     void ccMatrix(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > F2, MultidimArray<double> &result);

@@ -73,8 +73,8 @@ void ProgAngularAssignmentMag::show()
         printf("%d exp images of %d x %d in this group\n", int(sizeMdIn), int(Xdim), int(Ydim));
         //        printf("imgcc %d x %d from mdIn:%d, mdRef:%d\n", int(YSIZE(imgcc)), int(XSIZE(imgcc)), int(sizeMdIn), int(sizeMdRef));
         printf("\nstartBand= %d\n", int(startBand));
-        printf("finalBand= %d\n", int(finalBand));
-	printf("n_bands= %d\n", int(n_bands));
+        printf("finalBand= %d\n", int(finalBand3));
+        printf("n_bands= %d\n", int(n_bands3));
 
 	XmippMetadataProgram::show();
 	//        std::cout << "Input metadata              : "  << fnIn        << std::endl;
@@ -103,6 +103,9 @@ void ProgAngularAssignmentMag::preProcess()
     mdIn.read(fnIn);
     mdRef.read(fnRef);
 
+    //borrar esta
+    cont=0;
+
     // size of images
     size_t Zdim, Ndim;
     getImageSize(mdIn,Xdim,Ydim,Zdim,Ndim);
@@ -110,19 +113,40 @@ void ProgAngularAssignmentMag::preProcess()
     // some constants
     n_rad = size_t(Xdim/2 + 0.5);
 
-    //    startBand = size_t( (sampling*Xdim)/11.);
-    //    if (startBand >= n_rad)
-    //            startBand = n_rad-15;
-    //    finalBand = startBand + 15;
-    //    finalBand = (finalBand >= n_rad) ? n_rad-1 : finalBand;
+    // estos indices de inicio y parada van a ser los de los extremos
+    //tercer conjunto de bandas
+    startBand=size_t((sampling*Xdim)/40.);
+    finalBand3=size_t((sampling*Xdim)/7.);
+    finalBand3=(finalBand3 >= n_rad) ? n_rad-1 : finalBand3;
+    n_bands3=finalBand3-startBand;
 
-    startBand=size_t((sampling*Xdim)/16.);
-    startBand=(startBand >= n_rad) ? n_rad-16 : startBand;
-    finalBand=size_t((sampling*Xdim)/8.);
-    finalBand=(finalBand >= n_rad) ? n_rad-1 : finalBand;
+    // primer conjunto de bandas
+    n_bands1=int(n_bands3/3.+.5);
+    finalBand1=startBand+n_bands1;
 
-    n_bands = finalBand - startBand;
+    // segundo conjunto de bandas
+    n_bands2=2*n_bands1;
+    finalBand2=startBand+n_bands2;
 
+    // non-overlapped bands
+    startBand2=finalBand2-n_bands1;
+    startBand3=finalBand3-n_bands1;
+    n_bands3=finalBand3-startBand3;
+    n_bands2=finalBand2-startBand2;
+
+    //    // overlapped bands
+    //    startBand2=startBand;
+    //    startBand3=startBand;
+
+    //definir para operar bandas por separado -- No traslapar
+
+
+    printf("start-final:[%d-%d] y ancho %d\n",int(startBand),int(finalBand1), int(n_bands1));
+    printf("start-final:[%d-%d] y ancho %d\n",int(startBand2),int(finalBand2), int(n_bands2));
+    printf("start-final:[%d-%d] y ancho %d\n",int(startBand3),int(finalBand3), int(n_bands3));
+
+
+    //angulos
     n_ang = size_t(180);
     n_ang2 = 2*n_ang;
     maxShift = .10 * Xdim; // read maxShift as input parameter
@@ -142,8 +166,12 @@ void ProgAngularAssignmentMag::preProcess()
     MultidimArray< std::complex<double> >   MDaRefF2 ;
     MultidimArray<double>                   MDaRefFM ;
     MultidimArray<double>                   MDaRefFMs;
-    MultidimArray<double>                   MDaRefFMs_polarPart(n_bands, n_ang2);
-    MultidimArray< std::complex<double> >   MDaRefFMs_polarF;
+    MultidimArray<double>                   MDaRefFMs_polarPart1(n_bands1, n_ang2);
+    MultidimArray< std::complex<double> >   MDaRefFMs_polarF1;
+    MultidimArray<double>                   MDaRefFMs_polarPart2(n_bands2, n_ang2);
+    MultidimArray< std::complex<double> >   MDaRefFMs_polarF2;
+    MultidimArray<double>                   MDaRefFMs_polarPart3(n_bands3, n_ang2);
+    MultidimArray< std::complex<double> >   MDaRefFMs_polarF3;
 
     // try to storage all data related to reference images in memory
     for (int k = 0; k < sizeMdRef; k++){
@@ -158,17 +186,49 @@ void ProgAngularAssignmentMag::preProcess()
 	vecMDaRefF.push_back(MDaRefF);
 	transformerImage.getCompleteFourier(MDaRefF2);
 	_getComplexMagnitude(MDaRefF2, MDaRefFM);
-	completeFourierShift(MDaRefFM, MDaRefFMs);
-        MDaRefFMs_polarPart = imToPolar(MDaRefFMs,startBand,finalBand);
-	_applyFourierImage2(MDaRefFMs_polarPart, MDaRefFMs_polarF, n_ang);
-	vecMDaRefFMs_polarF.push_back(MDaRefFMs_polarF);
+        completeFourierShift(MDaRefFM, MDaRefFMs);
+        //aplica fourier y almacena en el ancho de banda 1
+        MDaRefFMs_polarPart1 = imToPolar(MDaRefFMs,startBand,finalBand1,n_bands1);
+        _applyFourierImage2(MDaRefFMs_polarPart1, MDaRefFMs_polarF1, n_ang);
+        vecMDaRefFMs_polarF1.push_back(MDaRefFMs_polarF1);
+        //        printf("size MDaRefFMs_polarF1: %d-%d\n",int(YSIZE(MDaRefFMs_polarF1)),int(XSIZE(MDaRefFMs_polarF1)));
+        //aplica fourier y almacena en el ancho de banda 2
+        MDaRefFMs_polarPart2 = imToPolar(MDaRefFMs,startBand2,finalBand2,n_bands2);
+        _applyFourierImage2(MDaRefFMs_polarPart2, MDaRefFMs_polarF2, n_ang);
+        vecMDaRefFMs_polarF2.push_back(MDaRefFMs_polarF2);
+        //        printf("size MDaRefFMs_polarF2: %d-%d\n",int(YSIZE(MDaRefFMs_polarF2)),int(XSIZE(MDaRefFMs_polarF2)));
+        //aplica fourier y almacena en el ancho de banda 3
+        MDaRefFMs_polarPart3 = imToPolar(MDaRefFMs,startBand3,finalBand3,n_bands3);
+        _applyFourierImage2(MDaRefFMs_polarPart3, MDaRefFMs_polarF3, n_ang);
+        vecMDaRefFMs_polarF3.push_back(MDaRefFMs_polarF3);
+        //        printf("size MDaRefFMs_polarF3: %d-%d\n",int(YSIZE(MDaRefFMs_polarF3)),int(XSIZE(MDaRefFMs_polarF3)));
     }
+
+    //    printf("terminó con imágenes referencia\n");
+    //    exit(1);
+
+    // // creo que debo definir esto luego dentro de processImage() quizá también sea problematico??
+    // aunque cuando pongo printf y MPI entonces imprime varias veces... quizá no esté mal ponerlos acá
     candidatesFirstLoop.resize(sizeMdRef);
     Idx.resize(sizeMdRef);
     candidatesFirstLoopCoeff.resize(sizeMdRef);
     bestTx.resize(sizeMdRef);
     bestTy.resize(sizeMdRef);
     bestRot.resize(sizeMdRef);
+
+    candidatesSecondLoop.resize(sizeMdRef);
+    Idx2.resize(sizeMdRef);
+    candidatesSecondLoopCoeff.resize(sizeMdRef);
+    bestTx2.resize(sizeMdRef);
+    bestTy2.resize(sizeMdRef);
+    bestRot2.resize(sizeMdRef);
+
+    candidatesThirdLoop.resize(sizeMdRef);
+    Idx3.resize(sizeMdRef);
+    candidatesThirdLoopCoeff.resize(sizeMdRef);
+    bestTx3.resize(sizeMdRef);
+    bestTy3.resize(sizeMdRef);
+    bestRot3.resize(sizeMdRef);
     // delay axes
     //    _delayAxes(Ydim, Xdim, n_ang);
     mdOut.setComment("experiment for metadata output containing data for reconstruction");
@@ -187,8 +247,15 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     MultidimArray< std::complex<double> >   MDaInF2 ;
     MultidimArray<double>                   MDaInFM ;
     MultidimArray<double>                   MDaInFMs;
-    MultidimArray<double>                   MDaInFMs_polarPart(n_bands, n_ang2);
-    MultidimArray< std::complex<double> >   MDaInFMs_polarF;
+    //n_bands1
+    MultidimArray<double>                   MDaInFMs_polarPart1(n_bands1, n_ang2);
+    MultidimArray< std::complex<double> >   MDaInFMs_polarF1; // mirar luego si esta se puede reutilizar
+    //n_bands2
+    MultidimArray<double>                   MDaInFMs_polarPart2(n_bands2, n_ang2);
+    MultidimArray< std::complex<double> >   MDaInFMs_polarF2; // mirar luego si esta se puede reutilizar
+    //n_bands3
+    MultidimArray<double>                   MDaInFMs_polarPart3(n_bands3, n_ang2);
+    MultidimArray< std::complex<double> >   MDaInFMs_polarF3; // mirar luego si esta se puede reutilizar
 
     // processing input image
     ImgIn.read(fnImg);
@@ -197,23 +264,29 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     transformerImage.getCompleteFourier(MDaInF2);
     _getComplexMagnitude(MDaInF2, MDaInFM);
     completeFourierShift(MDaInFM, MDaInFMs);
-    MDaInFMs_polarPart = imToPolar(MDaInFMs,startBand,finalBand);
-    _applyFourierImage2(MDaInFMs_polarPart, MDaInFMs_polarF, n_ang);
 
-    tempCoeff = -10.0;
+    // BANDA 1
+    // a partir de aquí es diferente para cada resolución.
+    MDaInFMs_polarPart1 = imToPolar(MDaInFMs,startBand,finalBand1,n_bands1);
+    _applyFourierImage2(MDaInFMs_polarPart1, MDaInFMs_polarF1, n_ang);
+
+    tempCoeff = 0.0;
     int k = 0;
     double bestCandVar, bestCoeff, Tx, Ty;
+
+    std::ofstream outfile("/home/jeison/Escritorio/TestOutfile.txt");
+
+    double band1_bestCoeff=-1.0;
+    int idx_band1=0;
+
     // loop over reference stack
     for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
         // computing relative rotation and traslation
-        ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot); // cambié PCO        
-        meanByColumn(ccMatrixRot, ccVectorRot);
-        //                printf("\ncorrelationMatrix\n");
-        //                _writeTestFile(ccVectorRot,"/home/jeison/Escritorio/meanColumn.txt",YSIZE(ccVectorRot),XSIZE(ccVectorRot));
-        //                exit(1);
-	peaksFound = 0;
-	std::vector<double>().swap(cand);
-        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0                
+        ccMatrix(MDaInFMs_polarF1, vecMDaRefFMs_polarF1[countRefImg], ccMatrixRot);
+        maxByColumn(ccMatrixRot, ccVectorRot); // el meanByColumn ha dado segmentation fault en asimov
+        peaksFound = 0;
+        std::vector<double>().swap(cand);
+        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
         // all the results are storaged for posterior partial_sort
         Idx[countRefImg] = k++;
@@ -222,162 +295,265 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         bestTx[countRefImg] = Tx;
         bestTy[countRefImg] = Ty;
         bestRot[countRefImg] = bestCandVar;
+        if(bestCoeff>band1_bestCoeff){
+            band1_bestCoeff=bestCoeff;
+            idx_band1=Idx[countRefImg];
+        }
     }
 
-    //    /*
-    // // skip second loop
-    // choose nCand of the candidates with best corrCoeff
-    int nCand = 1; // 1  3
+
+
+    // BANDA 2
+    // a partir de aquí es diferente para cada resolución
+    MDaInFMs_polarPart2 = imToPolar(MDaInFMs,startBand2,finalBand2,n_bands2);
+    _applyFourierImage2(MDaInFMs_polarPart2, MDaInFMs_polarF2, n_ang);
+
+    tempCoeff = 0.0;
+    k = 0;
+    //bestCandVar, bestCoeff, Tx, Ty;
+    // loop over reference stack
+    double band2_bestCoeff=-1.0;
+    int idx_band2=0;
+    for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
+        // computing relative rotation and traslation
+        ccMatrix(MDaInFMs_polarF2, vecMDaRefFMs_polarF2[countRefImg], ccMatrixRot);
+        maxByColumn(ccMatrixRot, ccVectorRot); // el meanByColumn ha dado segmentation fault (según yo, la suma es muy alta, hay que multiplicar por 1/size cada vez)
+        peaksFound = 0;
+        std::vector<double>().swap(cand);
+        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
+        bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+        // all the results are storaged for posterior partial_sort
+        Idx2[countRefImg] = k++;
+        candidatesSecondLoop[countRefImg] = countRefImg+1;
+        candidatesSecondLoopCoeff[countRefImg] = bestCoeff;
+        bestTx2[countRefImg] = Tx;
+        bestTy2[countRefImg] = Ty;
+        bestRot2[countRefImg] = bestCandVar;
+        if(bestCoeff>band2_bestCoeff){
+            band2_bestCoeff=bestCoeff;
+            idx_band2=Idx2[countRefImg];
+        }
+    }
+
+
+
+    // BANDA 3
+    // a partir de aquí es diferente para cada resolución
+    MDaInFMs_polarPart3 = imToPolar(MDaInFMs,startBand3,finalBand3,n_bands3);
+    _applyFourierImage2(MDaInFMs_polarPart3, MDaInFMs_polarF3, n_ang);
+
+    tempCoeff = 0.0;
+    k = 0;
+    //bestCandVar, bestCoeff, Tx, Ty;
+    // loop over reference stack
+    double band3_bestCoeff=-1.0;
+    int idx_band3=0;
+    for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
+        // computing relative rotation and traslation
+        ccMatrix(MDaInFMs_polarF3, vecMDaRefFMs_polarF3[countRefImg], ccMatrixRot);
+        maxByColumn(ccMatrixRot, ccVectorRot); // el meanByColumn ha dado segmentation fault en asimov
+        peaksFound = 0;
+        std::vector<double>().swap(cand);
+        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
+        bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+        // all the results are storaged for posterior partial_sort
+        Idx3[countRefImg] = k++;
+        candidatesThirdLoop[countRefImg] = countRefImg+1;
+        candidatesThirdLoopCoeff[countRefImg] = bestCoeff;
+        bestTx3[countRefImg] = Tx;
+        bestTy3[countRefImg] = Ty;
+        bestRot3[countRefImg] = bestCandVar;
+        if(bestCoeff>band3_bestCoeff){
+            band3_bestCoeff=bestCoeff;
+            idx_band3=Idx3[countRefImg];
+        }
+    }
+
+    // producto de la correlación normalizada para las 3 bandas procesadas
+    // Idx1-2-3 son los mismos. se puede aquí crear uno solo de esos
+    std::vector<double> candidatesNormalizedProduct;
+    candidatesNormalizedProduct.resize(sizeMdRef);
+    for(int ii=0;ii<sizeMdRef;ii++){
+        candidatesNormalizedProduct[ii]=(candidatesFirstLoopCoeff[ii]/band1_bestCoeff) *
+                                        (candidatesSecondLoopCoeff[ii]/band2_bestCoeff) *
+                                        (candidatesThirdLoopCoeff[ii]/band3_bestCoeff);
+    }
+
+    int nCand = sizeMdRef; // 1  3
     std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
-                      [&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
-
-    double rotRef, tiltRef;
-    for(int i = 0; i < nCand; i++){
-        // reading info of reference image candidate
-        mdRef.getRow(rowRef, size_t( candidatesFirstLoop[ Idx[i] ] ) );
-        rowRef.getValue(MDL_ANGLE_ROT, rotRef);
-        rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
-
-        //save metadata of images with angles
-        rowOut.setValue(MDL_IMAGE,       fnImgOut);
-        rowOut.setValue(MDL_ENABLED,     1);
-        rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop[ Idx[i] ]));
-        rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff[Idx[i]]);
-        rowOut.setValue(MDL_WEIGHT,      1.);
-        rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
-        rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
-        rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
-        rowOut.setValue(MDL_ANGLE_PSI,   bestRot[Idx[i]]);
-        rowOut.setValue(MDL_SHIFT_X,     -1 * bestTx[Idx[i]]);
-        rowOut.setValue(MDL_SHIFT_Y,     -1 * bestTy[Idx[i]]);
-        //        idxOut = mdOut.addObject(); // para la implementación paralela hay que fijarse acá cuando nCand = 3;
-        //        mdOut.setRow(rowOut,idxOut);
-    }
-    // */
+                      [&](int i, int j){return candidatesNormalizedProduct[i] > candidatesNormalizedProduct[j]; });
 
     /*
-    // choose nCand of the candidates with best corrCoeff
-    int nCand = int(.2*sizeMdRef+1);
-    std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
-                      [&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
-    // reference image related
-    //    Image<double>                           ImgRef;
-    //    MultidimArray<double>                   MDaRef(Ydim,Xdim);
-    MultidimArray< std::complex<double> >   MDaRefF  ;
-    MultidimArray< std::complex<double> >   MDaRefF2 ;
-    MultidimArray<double>                   MDaRefFM ;
-    MultidimArray<double>                   MDaRefFMs;
-    MultidimArray<double>                   MDaRefFMs_polarPart(n_bands, n_ang2);
-    MultidimArray< std::complex<double> >   MDaRefFMs_polarF;
-
-    k = 0;
-    // candidates second loop
-    std::vector<unsigned int>               candidatesFirstLoop2(nCand,0);
-    std::vector<unsigned int>               Idx2(nCand,0);
-    std::vector<double>                     candidatesFirstLoopCoeff2(nCand,0);
-    std::vector<double>                     bestTx2(nCand,0);
-    std::vector<double>                     bestTy2(nCand,0);
-    std::vector<double>                     bestRot2(nCand,0);
-    MultidimArray<double>                   MDaRefTrans;
-    for (int i = 0; i < nCand; i++){
-	// apply transform to reference images and recompute rotational and traslational parameters
-	double rotVal = bestRot[ Idx[i] ];        
-	double trasXval = bestTx[ Idx[i] ];
-	double trasYval = bestTy[ Idx[i] ];
-        //        printf("\nrotBefore: %.2f     \ttxBefore: %.2f     \ttyBefore: %.2f \n", rotVal, trasXval, trasYval);
-	_applyRotationAndShift(vecMDaRef[ Idx[i] ], rotVal, trasXval, trasYval, MDaRefTrans);
-
-        //        _writeTestFile(MDaIn,"/home/jeison/Escritorio/entrada.txt\n",YSIZE(MDaIn),XSIZE(MDaIn));
-        //        _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/transformada.txt\n",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
-
-
-        // // quiero hacer algo diferente a otra búsqueda de este tipo
-        // // podría ser por ejemplo usar este mismo esquema pero calculando una transformada de fourier más grande
-        // // para tener más información en la matriz de correlación
-        // // además debo limitar los resultados a que se encuentren en las vecindades de los que se hallaron en el loop anterior
-        // // o también utilizando transformada de fase
-        //	_applyFourierImage2(MDaRefTrans, MDaRefF);
-        //	transformerImage.getCompleteFourier(MDaRefF2);
-        //	_getComplexMagnitude(MDaRefF2, MDaRefFM);
-        //	completeFourierShift(MDaRefFM, MDaRefFMs);
-        //        MDaRefFMs_polarPart = imToPolar(MDaRefFMs,startBand,finalBand);
-        //	_applyFourierImage2(MDaRefFMs_polarPart, MDaRefFMs_polarF, n_ang);
-        //	// computing relative rotation and traslation
-        //	ccMatrix(MDaInFMs_polarF, MDaRefFMs_polarF, ccMatrixRot);
-        //	meanByColumn(ccMatrixRot, ccVectorRot);
-        //	peaksFound = 0;
-        //	std::vector<double>().swap(cand);
-        //        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound);
-        //        bestCand(MDaIn, MDaInF, MDaRefTrans, cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
-
-        _applyFourierImage2(MDaRefTrans, MDaRefF);
-        transformerImage.getCompleteFourier(MDaRefF2);
-        _getComplexMagnitude(MDaRefF2, MDaRefFM);
-        completeFourierShift(MDaRefFM, MDaRefFMs);
-        MDaRefFMs_polarPart = imToPolar(MDaRefFMs,startBand,finalBand);
-        _applyFourierImage2(MDaRefFMs_polarPart, MDaRefFMs_polarF, n_ang);
-        // computing relative rotation and traslation
-        ccMatrix(MDaInFMs_polarF, MDaRefFMs_polarF, ccMatrixRot);
-        meanByColumn(ccMatrixRot, ccVectorRot);
-        double rotValAux=0;
-        getRot(ccVectorRot,rotValAux,XSIZE(ccVectorRot),0.0); // en este punto ya está rotada y desplazada la imagen
-        //        printf("Xsize: %d\n",int(XSIZE(ccVectorRot)));
-        peaksFound=2; // el del loop anterior y este nuevo
-        std::vector<double> cand2{0.0,0.0};
-        //        std::cout<<"cand2 "<<cand2[0]<<", "<<cand2[1]<<std::endl;
-        cand2[0]=0.0; //queda la original, cambiar Best Cand para que no aplique rotación cero
-        cand2[1]=rotValAux;
-        //        std::cout<<"cand2 next "<<cand2[0]<<", "<<cand2[1]<<std::endl;
-        bestCand(MDaIn, MDaInF, MDaRefTrans, cand2, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
-
-        if(bestCoeff >= candidatesFirstLoopCoeff[Idx[i]]){
-            Idx2[i] = k++;
-            candidatesFirstLoop2[i] = candidatesFirstLoop[ Idx[i] ];
-            candidatesFirstLoopCoeff2[i] = bestCoeff;
-            bestTx2[i] = trasXval + Tx;
-            bestTy2[i] = trasYval + Ty;
-            bestRot2[i] = rotVal + bestCandVar;
-            //        printf("after_rot: %.2f     \tafter_tx: %.2f     \tafter_ty: %.2f \n", rotVal+bestCandVar, trasXval+Tx, trasYval+Ty);
-        }
-        else{
-            Idx2[i] = k++;
-            candidatesFirstLoop2[i] = candidatesFirstLoop[ Idx[i] ];
-            candidatesFirstLoopCoeff2[i] = candidatesFirstLoopCoeff[Idx[i]];
-            bestTx2[i] = trasXval;
-            bestTy2[i] = trasYval;
-            bestRot2[i] = rotVal;
-        }
+    int howMany=6;
+    if(cont<=howMany){
+        printf("maxBand1-idx: %.4f-%d,  maxBand2-idx: %.4f-%d,   maxBand3-idx: %.4f-%d, \n",
+               band1_bestCoeff, idx_band1,
+               band2_bestCoeff, idx_band2,
+               band3_bestCoeff, idx_band3);
+        printf("en candidato %d \t band1_corr %.4f  \t band2_corr %.4f  \t band3_corr %.4f\n",
+                candidatesFirstLoop[Idx[0]],
+                candidatesFirstLoopCoeff[Idx[0]],
+                candidatesSecondLoopCoeff[Idx[0]],
+                candidatesThirdLoopCoeff[Idx[0]]);
+        printf("en candidato %d \t band1_Rot %.2f  \t band2_Rot %.2f  \t band3_Rot %.2f\n",
+                candidatesFirstLoop[Idx[0]],
+                bestRot[Idx[0]],
+                bestRot2[Idx[0]],
+                bestRot3[Idx[0]]);
+        printf("en candidato %d \t band1_tx_ty [%.2f, %.2f]  \t band2_tx_ty [%.2f, %.2f]  \t band3_tx_ty [%.2f,%.2f]\n",
+                candidatesFirstLoop[Idx[0]],
+                bestTx[Idx[0]], bestTy[Idx[0]],
+                bestTx2[Idx[0]], bestTy2[Idx[0]],
+                bestTx3[Idx[0]], bestTy3[Idx[0]]);
     }
-    //    printf("\ntermina segundo loop\n");
-    nCand = 1; // 1  3
-    std::partial_sort(Idx2.begin(), Idx2.begin()+nCand, Idx2.end(),
-                      [&](int i, int j){return candidatesFirstLoopCoeff2[i] > candidatesFirstLoopCoeff2[j]; });
+    if (cont==howMany){
+        // test de escribir los resultados
+        for(int i=0;i<nCand;i++){
+            outfile<<candidatesFirstLoopCoeff[i]
+                   <<"\t"<<candidatesSecondLoopCoeff[i]
+                   <<"\t"<<candidatesThirdLoopCoeff[i]
+                   <<"\t"<<candidatesNormalizedProduct[i]
+                   <<"\t"<<bestRot[i]<<"\t"<<bestRot2[i]<<"\t"<<bestRot3[i]<<"\n\n";
+        }
+        outfile.close();
+
+        //          // no ha sido muy util porque ahora mismo trabajo solo con experimentales
+        //        // imprimir en archivos las imágenes implicadas.
+        //        printf("almacena Referencia-mejor_candidato. Idx:%d, rot: %.2f, Tx: %.2f, Tx: %.2f\n",
+        //               candidatesFirstLoop[Idx[0]]-1,bestRot[Idx[0]],bestTx[Idx[0]], bestTy[Idx[0]]);
+        //        // aplicar transformación e imprimir
+        //        MultidimArray<double> MDaTransformada;
+        //        _applyRotationAndShift(vecMDaRef[candidatesFirstLoop[Idx[0]-1]],bestRot[Idx[0]],
+        //                               bestTx[Idx[0]], bestTy[Idx[0]],MDaTransformada);
+        //        _writeTestFile(MDaTransformada,"/home/jeison/Escritorio/t_referenciaTransformada.txt",
+        //                      YSIZE(vecMDaRef[candidatesFirstLoop[Idx[0]-1]]),
+        //                      XSIZE(vecMDaRef[candidatesFirstLoop[Idx[0]-1]]));
+
+        //        printf("almacena experimental\n");
+        //        _writeTestFile(MDaIn,"/home/jeison/Escritorio/t_experimental.txt",
+        //                      YSIZE(MDaIn),
+        //                      XSIZE(MDaIn));
+
+        // solo para la imagen referencia encontrada como la mejor,
+        // volver a buscar rotación y shift
+        int bestIdxRef=candidatesFirstLoop[Idx[0]]-1;
+        MultidimArray<double>  finalRef(Ydim,Xdim); //UNUSED
+        MultidimArray< std::complex<double> >   finalRefF  ;
+        MultidimArray< std::complex<double> >   finalRefF2 ;
+        MultidimArray<double>                   finalRefFM ;
+        MultidimArray<double>                   finalRefFMs;
+        //n_bands
+        size_t finalNbands= finalBand3-startBand;
+        printf("finalNbands: %d\n",int(finalNbands));
+        MultidimArray<double>                   finalRefFMs_polarPart(finalNbands, n_ang2);
+        MultidimArray< std::complex<double> >   finalRefFMs_polarF;
+
+        _applyFourierImage2(vecMDaRef[candidatesFirstLoop[bestIdxRef]], finalRefF);
+        transformerImage.getCompleteFourier(finalRefF2);
+        _getComplexMagnitude(finalRefF2, finalRefFM);
+        completeFourierShift(finalRefFM, finalRefFMs);
+
+
+        finalRefFMs_polarPart = imToPolar(finalRefFMs,startBand,finalBand3,finalNbands);
+        _writeTestFile(finalRefFMs_polarPart,"/home/jeison/Escritorio/z_polarRef.txt",YSIZE(finalRefFMs_polarPart),XSIZE(finalRefFMs_polarPart));
+        _applyFourierImage2(finalRefFMs_polarPart, finalRefFMs_polarF, n_ang);
+
+        //experimental
+        MultidimArray<double>   MDaInFMs_finalpolarPart(finalNbands, n_ang2);
+        MultidimArray< std::complex<double> >   MDaInfinalFMs_polarF;
+        MDaInFMs_finalpolarPart = imToPolar(MDaInFMs,startBand,finalBand3,finalNbands);
+        _writeTestFile(MDaInFMs_finalpolarPart,"/home/jeison/Escritorio/z_polarEntrada.txt",YSIZE(MDaInFMs_finalpolarPart),XSIZE(MDaInFMs_finalpolarPart));
+        _applyFourierImage2(MDaInFMs_finalpolarPart, MDaInfinalFMs_polarF, n_ang);
+
+        ccMatrix(MDaInfinalFMs_polarF, finalRefFMs_polarF, ccMatrixRot);
+        maxByColumn(ccMatrixRot, ccVectorRot); // el meanByColumn ha dado segmentation fault en asimov
+
+        std::vector<double>().swap(cand);
+        peaksFound=0; bestCandVar=0;
+        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
+        _writeTestFile(ccVectorRot,"/home/jeison/Escritorio/z_ccVector.txt",1,XSIZE(ccVectorRot));
+        bestCand(MDaIn, MDaInF, vecMDaRef[candidatesFirstLoop[bestIdxRef]], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+
+        //results
+        printf("bestIdxRef+1: %d bestCoeff: %.3f Tx: %.3f Ty: %.3f bestCandVar: %.3f\n",bestIdxRef+1, bestCoeff, Tx, Ty, bestCandVar);
+
+
+        printf("\n\n*******************detener**************************\n\n");
+        exit(1);
+    } // */
+
+    // solo para la imagen referencia encontrada como la mejor,
+    // volver a buscar rotación y shift
+    int bestIdxRef=candidatesFirstLoop[Idx[0]]-1; // Idx fue organizada de mayor a menor basada en valor de correlación
+    MultidimArray< std::complex<double> >   finalRefF  ;
+    MultidimArray< std::complex<double> >   finalRefF2 ;
+    MultidimArray<double>                   finalRefFM ;
+    MultidimArray<double>                   finalRefFMs;
+    //n_bands
+    size_t finalNbands= finalBand3-startBand;
+    MultidimArray<double>                   finalRefFMs_polarPart(finalNbands, n_ang2);
+    MultidimArray< std::complex<double> >   finalRefFMs_polarF;
+
+    _applyFourierImage2(vecMDaRef[candidatesFirstLoop[bestIdxRef]], finalRefF);
+    transformerImage.getCompleteFourier(finalRefF2);
+    _getComplexMagnitude(finalRefF2, finalRefFM);
+    completeFourierShift(finalRefFM, finalRefFMs);
+    finalRefFMs_polarPart = imToPolar(finalRefFMs,startBand,finalBand3,finalNbands);
+    _applyFourierImage2(finalRefFMs_polarPart, finalRefFMs_polarF, n_ang);
+
+    //experimental
+    MultidimArray<double>   MDaInFMs_finalpolarPart(finalNbands, n_ang2);
+    MultidimArray< std::complex<double> >   MDaInfinalFMs_polarF;
+    MDaInFMs_finalpolarPart = imToPolar(MDaInFMs,startBand,finalBand3,finalNbands);
+    _applyFourierImage2(MDaInFMs_finalpolarPart, MDaInfinalFMs_polarF, n_ang);
+
+    ccMatrix(MDaInfinalFMs_polarF, finalRefFMs_polarF, ccMatrixRot);
+    maxByColumn(ccMatrixRot, ccVectorRot); // el meanByColumn ha dado segmentation fault en asimov
+
+    std::vector<double>().swap(cand);
+    peaksFound=0; bestCandVar=0;
+    rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
+    bestCand(MDaIn, MDaInF, vecMDaRef[candidatesFirstLoop[bestIdxRef]], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+
+    //results
+    printf("bestIdxRef+1: %d bestCoeff: %.3f Tx: %.3f Ty: %.3f bestCandVar: %.3f\n",bestIdxRef+1, bestCoeff, Tx, Ty, bestCandVar);
+
+
+
+    //        /*
+    // skip second loop
+   //     choose nCand of the candidates with best corrCoeff
+    /*int*/nCand = 1; // 1  3
 
     double rotRef, tiltRef;
     for(int i = 0; i < nCand; i++){
         // reading info of reference image candidate
-        mdRef.getRow(rowRef, size_t( candidatesFirstLoop2[ Idx2[i] ] ) );
+        mdRef.getRow(rowRef, size_t( bestIdxRef+1 ) );
         rowRef.getValue(MDL_ANGLE_ROT, rotRef);
         rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
 
         //save metadata of images with angles
         rowOut.setValue(MDL_IMAGE,       fnImgOut);
         rowOut.setValue(MDL_ENABLED,     1);
-        rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop2[ Idx2[i] ]));
-        rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff2[Idx2[i]]);
+        rowOut.setValue(MDL_IDX,         size_t(bestIdxRef+1));
+        rowOut.setValue(MDL_MAXCC,       bestCoeff);
         rowOut.setValue(MDL_WEIGHT,      1.);
         rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
         rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
         rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
-        rowOut.setValue(MDL_ANGLE_PSI,   bestRot2[Idx2[i]]);
-        rowOut.setValue(MDL_SHIFT_X,     -1. * bestTx2[Idx2[i]]);
-        rowOut.setValue(MDL_SHIFT_Y,     -1. * bestTy2[Idx2[i]]);
-        //        idxOut = mdOut.addObject(); // para la implementación paralela hay que fijarse acá cuando nCand = 3;
-        //        mdOut.setRow(rowOut,idxOut);
+        rowOut.setValue(MDL_ANGLE_PSI,   bestCandVar);
+        rowOut.setValue(MDL_SHIFT_X,     -1. * Tx);
+        rowOut.setValue(MDL_SHIFT_Y,     -1. * Ty);
     }
     // */
+
+
     //    duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
     //    std::cout << "Operation took "<< duration*1000 << "milliseconds" << std::endl;
+
+    //borrar
+    cont++;
+    printf("cont: %d\n",cont);
 }
 
 void ProgAngularAssignmentMag::postProcess(){
@@ -517,7 +693,8 @@ void ProgAngularAssignmentMag::_getComplexMagnitude( MultidimArray< std::complex
 *  rad and ang are the number of radius and angular elements*/
 MultidimArray<double> ProgAngularAssignmentMag::imToPolar(MultidimArray<double> &cartIm,
 							  size_t &startBand,
-							  size_t &finalBand){
+                                                          size_t &finalBand,
+                                                          size_t &n_bands){
 
     MultidimArray<double> polarImg(n_bands, n_ang2);
     float pi = 3.141592653;
@@ -1033,7 +1210,7 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
     *(bestCandRot) = 0;
     *(shift_x) = 0.;
     *(shift_y) = 0.;
-    *(bestCoeff) = -10.0;
+    *(bestCoeff) = 0.0;
     double rotVar = 0.0;
     double tempCoeff;
     double tx, ty;
@@ -1050,10 +1227,10 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         _applyRotation(MDaRef,rotVar,MDaRefRot);
         _applyFourierImage2(MDaRefRot,MDaRefRotF);
         ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix / phase correlation for shift (new)
-        meanByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
+        maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
         getShift(ccVectorTx,tx,XSIZE(ccMatrixShift));
         tx = -1. * tx;
-        meanByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
+        maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
         getShift(ccVectorTy,ty,YSIZE(ccMatrixShift));
         ty = -1. * ty;
         if ( std::abs(tx)>maxShift || std::abs(ty)>maxShift )
