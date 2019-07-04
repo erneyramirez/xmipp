@@ -68,10 +68,15 @@ public: // Internal members
     // vector of Fourier of reference images
     std::vector< MultidimArray< std::complex<double> > > vecMDaRefF;
 
-    // vector of Fourier of polar representation of magnitude spectrum of reference images to different scale
+    // vector of Fourier of polar representation of magnitude spectrum of reference images
     std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF1;
-    std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF2;
-    std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF3;
+
+    // vector of polar representation of magnitude of reference images from StarBand to finalBand
+    std::vector< MultidimArray<double> > vecMDaRef_polarPart;
+
+    //
+    MultidimArray<double>                   MDaRef_polarRow;  //almacenará filas
+    MultidimArray< std::complex<double> >   MDaRefFMs_polarF; //almacenará fourier de las filas
 
     // Size of the images
     size_t Xdim, Ydim;
@@ -102,9 +107,9 @@ public: // Internal members
     int sizeMdRef;
     int sizeMdIn;
     // some constants
-    size_t n_bands1, n_bands2, n_bands3;
-    size_t startBand,startBand2,startBand3;
-    size_t finalBand1, finalBand2, finalBand3;
+    size_t n_bands;
+    size_t startBand;
+    size_t finalBand;
     //    size_t startBandRef;
     //    size_t finalBandRef;
     size_t n_rad;
@@ -120,21 +125,6 @@ public: // Internal members
     std::vector<double>                     bestTx;
     std::vector<double>                     bestTy;
     std::vector<double>                     bestRot;
-
-    std::vector<unsigned int>               candidatesSecondLoop;
-    std::vector<unsigned int>               Idx2;
-    std::vector<double>                     candidatesSecondLoopCoeff;
-    std::vector<double>                     bestTx2;
-    std::vector<double>                     bestTy2;
-    std::vector<double>                     bestRot2;
-
-    std::vector<unsigned int>               candidatesThirdLoop;
-    std::vector<unsigned int>               Idx3;
-    std::vector<double>                     candidatesThirdLoopCoeff;
-    std::vector<double>                     bestTx3;
-    std::vector<double>                     bestTy3;
-    std::vector<double>                     bestRot3;
-
 
 public:
     // constructor
@@ -182,7 +172,7 @@ private:
     MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, size_t &startBand, size_t &finalBand, size_t &n_bands);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
-    void ccMatrix(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > F2, MultidimArray<double> &result);
+    void ccMatrix(MultidimArray<std::complex<double> > F1, MultidimArray<std::complex<double> > F2, MultidimArray<double> &result);
     void selectBands(MultidimArray<double> &in, MultidimArray<double> &out);
     void maxByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
     void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size, int *nPeaksFound);
@@ -196,8 +186,8 @@ private:
     void bestCand2(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
     void _applyRotationAndShift(MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
     void rotCandidates2(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
-    void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
-    void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
+    void applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
+    void applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
     void halfFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     MultidimArray<double> imToPolar2(MultidimArray<double> &cartIm, const size_t &rad, const size_t &ang);
     void rotCandidates3(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);    
