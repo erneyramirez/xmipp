@@ -216,7 +216,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         bestRot[countRefImg] = bestCandVar;
     }
 
-    /*
+    //    /*
     // // skip second loop
     // choose nCand of the candidates with best corrCoeff
     int nCand = 1; // 1  3
@@ -247,7 +247,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     }
     // */
 
-    //    /*
+    /*
     // choose nCand of the candidates with best corrCoeff for second loop candidate search.
     // for example 90%... select better
     int nCand = int(.9*sizeMdRef+1);
@@ -286,6 +286,10 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         _applyFourierImage2(MDaRefFMs_polarPart, MDaRefFMs_polarF, n_ang);
         // computing relative rotation and traslation
         ccMatrix(MDaInFMs_polarF, MDaRefFMs_polarF, ccMatrixRot);
+
+//        _writeTestFile(ccMatrixRot,"/home/jeison/Escritorio/z_ccMatrix.txt",YSIZE(ccMatrixRot),XSIZE(ccMatrixRot));
+//        exit(1);
+
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
@@ -384,16 +388,16 @@ void ProgAngularAssignmentMag::postProcess(){
 /* Pearson Coeff */
 void ProgAngularAssignmentMag::pearsonCorr(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff){
 
-    //    MultidimArray<double>   X2(Ydim,Xdim);
-    //    MultidimArray<double>   Y2(Ydim,Xdim);
-    //    _applyCircularMask(X,X2);
-    //    _applyCircularMask(Y,Y2);
+    MultidimArray<double>   X2(Ydim,Xdim);
+    MultidimArray<double>   Y2(Ydim,Xdim);
+    _applyCircularMask(X,X2);
+    _applyCircularMask(Y,Y2);
     // covariance
     double X_m, Y_m, X_std, Y_std;
-    arithmetic_mean_and_stddev(X, X_m, X_std);
-    arithmetic_mean_and_stddev(Y, Y_m, Y_std);
+    arithmetic_mean_and_stddev(X2, X_m, X_std);
+    arithmetic_mean_and_stddev(Y2, Y_m, Y_std);
 
-    double prod_mean = mean_of_products(X, Y);
+    double prod_mean = mean_of_products(X2, Y2);
     double covariace = prod_mean - (X_m * Y_m);
 
     coeff = covariace / (X_std * Y_std);
@@ -1026,7 +1030,11 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         rotVar = -1. * cand[i]; //
         _applyRotation(MDaRef,rotVar,MDaRefRot);
         _applyFourierImage2(MDaRefRot,MDaRefRotF);
-        ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix / phase correlation for shift (new)
+        ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix
+
+        //        _writeTestFile(ccMatrixShift,"/home/jeison/Escritorio/z_ccMatrix.txt",YSIZE(ccMatrixShift),XSIZE(ccMatrixShift));
+        //        exit(1);
+
         maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
         getShift(ccVectorTx,tx,XSIZE(ccMatrixShift));
         tx = -1. * tx;
