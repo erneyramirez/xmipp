@@ -207,7 +207,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     int k = 0;
     double bestCandVar, bestCoeff, Tx, Ty;
 
-
+    std::ofstream outfile("/home/jeison/Escritorio/matrizCorrelaciones.txt");
     for(int countRefImg=0;countRefImg<sizeMdRef;countRefImg++){
         // para hacerlo ráapido hay que evitar el calculo tan repetido de las cosas relacionadas con las
         // imágenes referencia.
@@ -225,9 +225,11 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         double antMaxVal=0;
         for(int k=0;k<XSIZE(ccVectorRot);k++){
             val = dAi(ccVectorRot,k);
+            outfile << val << "  ";
             if(val>antMaxVal)
                 antMaxVal=val;
         }
+        outfile<<"\n";
         int bestBand=0;
         for(int b=1; b<n_bands;b++){
             //referencia
@@ -241,16 +243,19 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
             double thisMax=0;
             for(int k=0;k<XSIZE(ccVectorRot);k++){
                 val = dAi(ccVectorRot,k);
+                outfile << val << "  ";
                 if(val>thisMax)
                     thisMax=val;
             }
+            outfile<<"\n";
             if (thisMax>antMaxVal){
                 antMaxVal=thisMax;
                 bestBand=b;
             }
         }
+        outfile.close();
 
-        //        printf("\nbestBand: %d\n",bestBand);
+        printf("\nbestBand: %d \t maxVal: %.4f\n",bestBand, antMaxVal);
         // esto hacerlo luego diferente para no tener que calcular una vez más.
         // se puede en el loop de las bandas, hacer un pushBack de ccVectors
         //referencia
@@ -261,12 +266,14 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         applyFourierImage(MDaIn_polarRow, MDaInFMs_polarF, n_ang);
         // correlación
         ccMatrix(MDaInFMs_polarF,MDaRefFMs_polarF,ccVectorRot);
+        _writeTestFile(ccVectorRot,"/home/jeison/Escritorio/correlacionMejorBanda.txt",YSIZE(ccVectorRot),XSIZE(ccVectorRot));
 
         //una vez se obtenga la banda para la cual se encuentra el pico más alto, ese ccVector correspondiente se calcula rot y shift
         peaksFound = 0;
         std::vector<double>().swap(cand);
-        rotCandidates3(ccVectorRot, cand, XSIZE(ccVectorRot), &peaksFound);
+        rotCandidates(ccVectorRot, cand, XSIZE(ccVectorRot), &peaksFound);
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+        printf("mejor 1 banda: %.2f  --correlacion %.2f \n", bestCandVar,bestCoeff);
         // all the results are storaged for posterior partial_sort
         Idx[countRefImg] = k++;
         candidatesFirstLoop[countRefImg] = countRefImg+1;
@@ -274,11 +281,40 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         bestTx[countRefImg] = Tx;
         bestTy[countRefImg] = Ty;
         bestRot[countRefImg] = bestCandVar;
+
+        // ahora a calcular usando más bandas
+        // referencia
+        applyFourierImage(vecMDaRef_polarPart[countRefImg],MDaRefFMs_polarF,n_ang);
+        //entrada
+        applyFourierImage(MDaInFMs_polarPart,MDaInFMs_polarF,n_ang);
+        // correlación
+        ccMatrix(MDaInFMs_polarF,MDaRefFMs_polarF,ccMatrixRot);
+        maxByColumn(ccMatrixRot,ccVectorRot);
+        _writeTestFile(ccVectorRot,"/home/jeison/Escritorio/correlacionTodas.txt",YSIZE(ccVectorRot),XSIZE(ccVectorRot));
+
+        //una vez se obtenga la banda para la cual se encuentra el pico más alto, ese ccVector correspondiente se calcula rot y shift
+        peaksFound = 0;
+        std::vector<double>().swap(cand);
+        rotCandidates(ccVectorRot, cand, XSIZE(ccVectorRot), &peaksFound);
+        //printf("\ncandidatos: %.2f, %.2f, %.2f, %.2f \n", cand[0],cand[1], cand[2], cand[3]);
+        bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+        printf("\nmejor varias bandas: %.2f  --correlacion %.2f \n", bestCandVar,bestCoeff);
+        // all the results are storaged for posterior partial_sort
+        Idx[countRefImg] = k++;
+        candidatesFirstLoop[countRefImg] = countRefImg+1;
+        candidatesFirstLoopCoeff[countRefImg] = bestCoeff;
+        bestTx[countRefImg] = Tx;
+        bestTy[countRefImg] = Ty;
+        bestRot[countRefImg] = bestCandVar;
+
+
+
+        exit(1);
     }
 
     // // skip second loop
     // choose nCand of the candidates with best corrCoeff
-    int nCand = sizeMdRef; // 1  3
+    int nCand = 1; // 1  3
     std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
                       [&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
 
@@ -625,12 +661,12 @@ void ProgAngularAssignmentMag::ccMatrix(MultidimArray< std::complex<double>> F1,
         c=(*ptrFFT2++);
         d=(*ptrFFT2++)*(-1); //(-1);
         // //GCC
-        *ptrFFT1++ = a*c-b*d;
-        *ptrFFT1++ = b*c+a*d;
+        //        *ptrFFT1++ = a*c-b*d;
+        //        *ptrFFT1++ = b*c+a*d;
         // // for Compactly supported correlation
         // // F2 is reference image
-        //        *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
-        //        *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
+        *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
+        *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
 
     }
 
@@ -917,14 +953,17 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
 	free(peakPos);
 
 	// sorting first in case there are more than maxAccepted peaks
+        // change later for only partial Sort
 	std::sort(temp.begin(), temp.end(), [&](int i, int j){return dAi(in,i) > dAi(in,j); } );
 
 	int tam = 2*maxAccepted; //
 	*(nPeaksFound) = tam;
 	cand.reserve(tam);
-	for(i = 0; i < maxAccepted; i++){
-	    cand[i] = dAi(axRot,temp[i]);
-	    cand[i+maxAccepted] =(cand[i]>0) ? cand[i] + 180 : cand[i] - 180 ;
+        double interpIdx; // quadratic interpolated location of peak
+	for(i = 0; i < maxAccepted; i++){            
+            interpIdx = quadInterp(temp[i], in);
+            cand[i] =  double( size - 1 )/2. - interpIdx;
+            cand[i+maxAccepted] =(cand[i]>0) ? cand[i] + 180 : cand[i] - 180 ;
 	}
     }
     else{
