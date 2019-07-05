@@ -223,6 +223,9 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
                       [&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
 
+    printf("\nmejor valor de correlación: %.3f\n", candidatesFirstLoopCoeff[Idx[0]]);
+    exit(1);
+
     double rotRef, tiltRef;
     for(int i = 0; i < nCand; i++){
         // reading info of reference image candidate
@@ -495,10 +498,11 @@ void ProgAngularAssignmentMag::_getComplexMagnitude( MultidimArray< std::complex
 /* cartImg contains cartessian  grid representation of image,
 *  rad and ang are the number of radius and angular elements*/
 MultidimArray<double> ProgAngularAssignmentMag::imToPolar(MultidimArray<double> &cartIm,
-                                                          size_t &startBand,
-                                                          size_t &finalBand){
+                                                          size_t &start,
+                                                          size_t &stop){
 
-    MultidimArray<double> polarImg(n_bands, n_ang2);
+    size_t this_nBands=stop-start;
+    MultidimArray<double> polarImg(this_nBands, n_ang2);
     float pi = 3.141592653;
     // coordinates of center
     //    double cy = (Ydim+1)/2.0;
@@ -515,14 +519,14 @@ MultidimArray<double> ProgAngularAssignmentMag::imToPolar(MultidimArray<double> 
 
     // loop through rad and ang coordinates
     double r, t, x_coord, y_coord;
-    for(size_t ri = startBand; ri < finalBand; ri++){
+    for(size_t ri = start; ri < stop; ri++){
         for(size_t ti = 0; ti < n_ang2; ti++ ){
             r = ri * delR;
             t = ti * delT;
             x_coord = ( r * cos(t) ) * sfx + cx;
             y_coord = ( r * sin(t) ) * sfy + cy;
             // set value of polar img
-            DIRECT_A2D_ELEM(polarImg,ri-startBand,ti) = interpolate(cartIm,x_coord,y_coord);
+            DIRECT_A2D_ELEM(polarImg,ri-start,ti) = interpolate(cartIm,x_coord,y_coord);
         }
     }
 
@@ -1031,6 +1035,19 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
     MultidimArray<double> ccVectorTy;
     MultidimArray< std::complex<double> > MDaRefRotF;
 
+    // nuevas variables
+    MultidimArray<double> MDaRefRot2;
+    MultidimArray<double> MDaRefRotShift2;
+    MultidimArray<double> ccMatrixShift2;
+    MultidimArray<double> ccVectorTx2;
+    MultidimArray<double> ccVectorTy2;
+    MultidimArray< std::complex<double> > MDaRefRotF2;
+
+
+    MultidimArray< std::complex<double> > MDaInAuxF;
+    MultidimArray< std::complex<double> > MDaRefAuxF;
+
+
     MDaRefRot.setXmippOrigin();
     for(int i = 0; i < peaksFound; i++){
         rotVar = -1. * cand[i]; //
@@ -1038,7 +1055,7 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         _applyFourierImage2(MDaRefRot,MDaRefRotF);
         ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix
 
-        //        _writeTestFile(ccMatrixShift,"/home/jeison/Escritorio/z_ccMatrix.txt",YSIZE(ccMatrixShift),XSIZE(ccMatrixShift));
+        //_writeTestFile(ccMatrixShift,"/home/jeison/Escritorio/z_ccMatrixShift.txt",YSIZE(ccMatrixShift),XSIZE(ccMatrixShift));
         //        exit(1);
 
         maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
@@ -1050,8 +1067,53 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         if ( std::abs(tx)>maxShift || std::abs(ty)>maxShift )
             continue;
         _applyShift(MDaRefRot, tx, ty, MDaRefRotShift);
-        // Pearson coeff
+
+        // solo para comparar si mejora
         pearsonCorr(MDaIn, MDaRefRotShift, tempCoeff);
+        //        printf("\nantes:\nrotval: %.3f \t tx: %.3f \t ty: %.3f \t corr: %.3f \n",rotVar,tx,ty,tempCoeff);
+
+
+
+        /*
+        // before compute pearson coeff, search rotation again using polar representation of images
+        MultidimArray<double> inPolar(n_bands, n_ang2);
+        MultidimArray<double> refPolar(n_bands, n_ang2);
+        size_t first=0; // esta selección me ha estado dando problemas
+        size_t last=n_rad;
+
+        inPolar=imToPolar(MDaIn,first,last); // desplegar contenido luego
+        _applyFourierImage2(inPolar,MDaInAuxF,n_ang);
+
+        refPolar=imToPolar(MDaRefRotShift,first,last); // mando referencia transformada
+        _applyFourierImage2(refPolar,MDaRefAuxF,n_ang);
+
+
+        ccMatrix(MDaInAuxF,MDaRefAuxF,ccMatrixShift2); // es variable matrixShift aunque busco rot, no hay error
+        maxByColumn(ccMatrixShift2, ccVectorTx); // ccvMatrix to ccVector
+        getRot(ccVectorTx,rotVar,XSIZE(ccMatrixShift2));
+
+        // y vuelvo a buscar Shift
+        rotVar = -1. * rotVar; //
+        _applyRotation(MDaRefRotShift,rotVar,MDaRefRot2);
+        _applyFourierImage2(MDaRefRot2,MDaRefRotF2);
+        ccMatrix(MDaInF, MDaRefRotF2, ccMatrixShift2);// cross-correlation matrix
+
+        maxByColumn(ccMatrixShift2, ccVectorTx2); // ccvMatrix to ccVector
+        getShift(ccVectorTx2,tx,XSIZE(ccMatrixShift2));
+        tx = -1. * tx;
+        maxByRow(ccMatrixShift2, ccVectorTy2); // ccvMatrix to ccVector
+        getShift(ccVectorTy2,ty,YSIZE(ccMatrixShift2));
+        ty = -1. * ty;
+        if ( std::abs(tx)>maxShift || std::abs(ty)>maxShift )
+            continue;
+        _applyShift(MDaRefRot2, tx, ty, MDaRefRotShift2);
+        // Pearson coeff
+        pearsonCorr(MDaIn, MDaRefRotShift2, tempCoeff);
+
+        // borrar luego esta impresion
+        //        printf("despues:\nrotval: %.3f \t tx: %.3f \t ty: %.3f \t corr: %.3f \n",rotVar,tx,ty,tempCoeff);
+        // */
+
         if ( tempCoeff > *(bestCoeff) ){
             *(bestCoeff) = tempCoeff;
             *(shift_x) = tx;
@@ -1209,12 +1271,14 @@ void ProgAngularAssignmentMag::getShift(MultidimArray<double> &ccVector, double 
 
 
 /* finds rot as maximum of ccVector for a region near the center */
-void ProgAngularAssignmentMag::getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size, const double &oldAngle){
+void ProgAngularAssignmentMag::getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size){
     double maxVal = -10.;
     int idx;
     int i;
-    int lb= int(size/2-5);
-    int hb=int(size/2+5);
+    //    int lb= int(size/2-5);
+    //    int hb=int(size/2+5);
+    int lb= 89;
+    int hb=270;
     for(i = lb; i < hb+1; i++){
         if(dAi(ccVector,i) > maxVal){
             maxVal = dAi(ccVector,i);

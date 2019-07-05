@@ -161,7 +161,7 @@ private:
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
     void _getComplexMagnitude(MultidimArray<std::complex<double> > &FourierData, MultidimArray<double> &FourierMag);
-    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm,size_t &startBand,size_t &finalBand);
+    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, size_t &start, size_t &stop);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     void ccMatrix(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > F2, MultidimArray<double> &result);
@@ -186,7 +186,7 @@ private:
     void _applyCircularMask(const MultidimArray<double> &in, MultidimArray<double> &out);
     void newApplyGeometry(MultidimArray<double> &in, MultidimArray<double> &out, const double &a, const double &b, const double &c, const double &d, const double &tx, const double &ty);
     void ccMatrixPCO(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
-    void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size, const double &oldAngle);
+    void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size);
     void meanByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void meanByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
 };
