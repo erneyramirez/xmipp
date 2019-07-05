@@ -201,11 +201,11 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     // loop over reference stack
     for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
         // computing relative rotation and traslation
-        ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot); // cambié PCO
+        ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot);
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
-        rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
+        rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound);
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
         // all the results are storaged for posterior partial_sort
         Idx[countRefImg] = k++;
@@ -666,9 +666,9 @@ void ProgAngularAssignmentMag::ccMatrix(MultidimArray< std::complex<double>> &F1
         //        *ptrFFT1++ = a*c-b*d;
         //        *ptrFFT1++ = b*c+a*d;
         // // for Compactly supported correlation
-        // F2 is reference image
-        *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
-        *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
+        // // F2 is reference image
+        //        *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
+        //        *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
         //        //phase correlation only
         //        double den = (a*c-b*d)*(a*c-b*d) + (b*c+a*d)*(b*c+a*d);
         //        *ptrFFT1++ = (a*c-b*d)/(den+0.001);
