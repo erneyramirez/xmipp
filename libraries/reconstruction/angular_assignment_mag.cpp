@@ -397,8 +397,8 @@ void ProgAngularAssignmentMag::pearsonCorr(MultidimArray<double> &X, MultidimArr
     arithmetic_mean_and_stddev(X2, X_m, X_std);
     arithmetic_mean_and_stddev(Y2, Y_m, Y_std);
 
-    double prod_mean = mean_of_products(X2, Y2);
-    double covariace = prod_mean - (X_m * Y_m);
+    double mean_prod = mean_of_products(X2, Y2);
+    double covariace = mean_prod - (X_m * Y_m);
 
     coeff = covariace / (X_std * Y_std);
 }
@@ -407,7 +407,7 @@ void ProgAngularAssignmentMag::_applyCircularMask(const MultidimArray<double> &i
 
     double Cf = (Ydim + (Ydim % 2)) / 2.0; // for odd/even images
     double Cc = (Xdim + (Xdim % 2)) / 2.0;
-    int pixReduc = 1;
+    int pixReduc = 2;
     double rad2 = (Cf - pixReduc) * (Cf - pixReduc);
     double val = 0;
     out.initZeros(Ydim,Xdim);
@@ -662,13 +662,17 @@ void ProgAngularAssignmentMag::ccMatrix(MultidimArray< std::complex<double>> &F1
         b=(*(ptrFFT1+1))*dSize;
         c=(*ptrFFT2++);
         d=(*ptrFFT2++)*(-1); //(-1);
-        //        GCC
+        //        //GCC
         //        *ptrFFT1++ = a*c-b*d;
         //        *ptrFFT1++ = b*c+a*d;
         // // for Compactly supported correlation
-        // // F2 is reference image
+        // F2 is reference image
         *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
         *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
+        //        //phase correlation only
+        //        double den = (a*c-b*d)*(a*c-b*d) + (b*c+a*d)*(b*c+a*d);
+        //        *ptrFFT1++ = (a*c-b*d)/(den+0.001);
+        //        *ptrFFT1++ = (b*c+a*d)/(den+0.001);
 
     }
 
@@ -929,7 +933,7 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
                                              std::vector<double> &cand,
                                              const size_t &size, int *nPeaksFound){
     const int maxNumPeaks = 30;
-    int maxAccepted = 8;
+    int maxAccepted = 4;
     int *peakPos = (int*) calloc(maxNumPeaks,sizeof(int));
     int cont = 0;
     *(nPeaksFound) = cont;
