@@ -205,7 +205,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
-        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
+        rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3 // aquí hay que revisar lo que puedo hacer cuando peaksFound==0
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
         // all the results are storaged for posterior partial_sort
         Idx[countRefImg] = k++;
@@ -929,7 +929,7 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
                                              std::vector<double> &cand,
                                              const size_t &size, int *nPeaksFound){
     const int maxNumPeaks = 30;
-    int maxAccepted = 4;
+    int maxAccepted = 8;
     int *peakPos = (int*) calloc(maxNumPeaks,sizeof(int));
     int cont = 0;
     *(nPeaksFound) = cont;
@@ -962,8 +962,10 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
         int tam = 2*maxAccepted; //
         *(nPeaksFound) = tam;
         cand.reserve(tam);
+        double interpIdx; // quadratic interpolated location of peak
         for(i = 0; i < maxAccepted; i++){
-            cand[i] = dAi(axRot,temp[i]);
+            interpIdx = quadInterp(temp[i], in);
+            cand[i] =  double( size - 1 )/2. - interpIdx;
             cand[i+maxAccepted] =(cand[i]>0) ? cand[i] + 180 : cand[i] - 180 ;
         }
     }
