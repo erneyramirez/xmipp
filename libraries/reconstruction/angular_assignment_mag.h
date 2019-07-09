@@ -153,7 +153,7 @@ public:
 
 private:
     void printSomeValues(MultidimArray<double> & MDa);
-    void pearsonCorr(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void arithmetic_mean_and_stddev(MultidimArray<double> &data, double &avg, double &stddev);
     double mean_of_products(MultidimArray<double> &data1, MultidimArray<double> &data2);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName);
@@ -161,16 +161,16 @@ private:
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
     void _getComplexMagnitude(MultidimArray<std::complex<double> > &FourierData, MultidimArray<double> &FourierMag);
-    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm,size_t &startBand,size_t &finalBand);
+    MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, size_t &start, size_t &final);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
-    void ccMatrix(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > F2, MultidimArray<double> &result);
+    void ccMatrix(const MultidimArray<std::complex<double> > &F1, const MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
     void selectBands(MultidimArray<double> &in, MultidimArray<double> &out);
     void maxByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
     void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size, int *nPeaksFound);
     void _delayAxes(const size_t &Ydim, const size_t &Xdim, const size_t &n_ang);
-    void bestCand(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
-    void _applyRotation(MultidimArray<double> &MDaRef, double &rot, MultidimArray<double> &MDaRefRot);
+    void bestCand(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
+    void _applyRotation(const MultidimArray<double> &MDaRef, double &rot, MultidimArray<double> &MDaRefRot);
     void maxByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void getShift(MultidimArray<double> &ccVector, double &shift, const size_t &size);
     void _applyShift(MultidimArray<double> &MDaRef, double &tx, double &ty, MultidimArray<double> &MDaRefShift);
