@@ -113,7 +113,7 @@ void ProgAngularAssignmentMag::preProcess()
 
     startBand=size_t((sampling*Xdim)/100.);
     startBand=(startBand >= n_rad) ? n_rad-16 : startBand;
-    finalBand=size_t((sampling*Xdim)/16.);  // 16 debe estar relacionado con la máxima resolución en protocol MaxTargetResolution
+    finalBand=size_t((sampling*Xdim)/(sampling*3+1));  // den MaxTargetResolution related
     finalBand=(finalBand >= n_rad) ? n_rad-1 : finalBand;
 
     n_bands = finalBand - startBand;
@@ -214,10 +214,6 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         bestTx[countRefImg] = Tx;
         bestTy[countRefImg] = Ty;
         bestRot[countRefImg] = bestCandVar;
-
-        //        if(countRefImg==0){
-        //            _writeTestFile(ccMatrixRot,"/home/jeison/Escritorio/z_ccVector1.txt",YSIZE(ccMatrixRot),XSIZE(ccMatrixRot));
-        //        }
     }
 
     //    /*
@@ -246,8 +242,6 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         rowOut.setValue(MDL_ANGLE_PSI,   bestRot[Idx[i]]);
         rowOut.setValue(MDL_SHIFT_X,     -1 * bestTx[Idx[i]]);
         rowOut.setValue(MDL_SHIFT_Y,     -1 * bestTy[Idx[i]]);
-        //        idxOut = mdOut.addObject(); // para la implementación paralela hay que fijarse acá cuando nCand = 3;
-        //        mdOut.setRow(rowOut,idxOut);
     }
     // */
 
@@ -440,7 +434,7 @@ void ProgAngularAssignmentMag::postProcess(){
 }
 
 /* Pearson Coeff */
-void ProgAngularAssignmentMag::pearsonCorr(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff){
+void ProgAngularAssignmentMag::pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff){
 
     MultidimArray<double>   X2(Ydim,Xdim);
     MultidimArray<double>   Y2(Ydim,Xdim);
@@ -689,8 +683,8 @@ void ProgAngularAssignmentMag::halfFourierShift(MultidimArray<double> &in, Multi
 /* experiment for GCC matrix product F1 .* conj(F2)
 *
 */
-void ProgAngularAssignmentMag::ccMatrix(MultidimArray< std::complex<double>> &F1,
-                                        MultidimArray< std::complex<double>> F2,/*reference image*/
+void ProgAngularAssignmentMag::ccMatrix(const MultidimArray< std::complex<double>> &F1,
+                                        const MultidimArray< std::complex<double>> &F2,/*reference image*/
                                         MultidimArray<double> &result){
 
 
@@ -1062,9 +1056,9 @@ void ProgAngularAssignmentMag::_delayAxes(const size_t &Ydim, const size_t &Xdim
  * vector<double> cand contains candidates to relative rotation between images
 */
 void ProgAngularAssignmentMag::bestCand(/*inputs*/
-                                        MultidimArray<double> &MDaIn,
-                                        MultidimArray< std::complex<double> > &MDaInF,
-                                        MultidimArray<double> &MDaRef,
+                                        const MultidimArray<double> &MDaIn,
+                                        const MultidimArray< std::complex<double> > &MDaInF,
+                                        const MultidimArray<double> &MDaRef,
                                         std::vector<double> &cand,
                                         int &peaksFound,
                                         /*outputs*/
@@ -1278,7 +1272,7 @@ void ProgAngularAssignmentMag::newApplyGeometry(MultidimArray<double>& __restric
 }
 
 /* apply rotation */
-void ProgAngularAssignmentMag::_applyRotation(MultidimArray<double> &MDaRef, double &rot,
+void ProgAngularAssignmentMag::_applyRotation(const MultidimArray<double> &MDaRef, double &rot,
                                               MultidimArray<double> &MDaRefRot){
     // Transform matrix
     Matrix2D<double> A(3,3);
