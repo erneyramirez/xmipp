@@ -140,6 +140,9 @@ void ProgAngularAssignmentMag::preProcess()
     MultidimArray<double>                   MDaRefFMs_polarPart(n_bands, n_ang2);
     MultidimArray< std::complex<double> >   MDaRefFMs_polarF;
 
+    // precompute Hann window
+    computeHann();
+
     // try to storage all data related to reference images in memory
     for (int k = 0; k < sizeMdRef; k++){
         // reading image
@@ -148,6 +151,7 @@ void ProgAngularAssignmentMag::preProcess()
         // processing reference image
         ImgRef.read(fnImgRef);
         MDaRef = ImgRef();
+        hannWindow(MDaRef); //apply hann window to reference image
         vecMDaRef.push_back(MDaRef);
         _applyFourierImage2(MDaRef, MDaRefF);
         vecMDaRefF.push_back(MDaRefF);
@@ -188,6 +192,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     // processing input image
     ImgIn.read(fnImg);
     MDaIn = ImgIn();
+    hannWindow(MDaIn); //apply hann window to input experimental image
     _applyFourierImage2(MDaIn, MDaInF);
     transformerImage.getCompleteFourier(MDaInF2);
     _getComplexMagnitude(MDaInF2, MDaInFM);
@@ -201,11 +206,11 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     // loop over reference stack
     for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
         // computing relative rotation and traslation
-        ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot); // cambié PCO
+        ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot);
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
-        rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); // rotcandidates3
+        rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound);
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
         // all the results are storaged for posterior partial_sort
         Idx[countRefImg] = k++;
@@ -385,13 +390,19 @@ void ProgAngularAssignmentMag::postProcess(){
     transformerPolarImage.cleanup();
 }
 
-/* Pearson Coeff */
-void ProgAngularAssignmentMag::pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff){
+/* Pearson Coeff  Revisar luego si es necesario pasar copias o hay alternativa en MultidimArray como un alias o algo asi*/
+void ProgAngularAssignmentMag::pearsonCorr(MultidimArray<double> X2, MultidimArray<double> Y2, double &coeff){
 
-    MultidimArray<double>   X2(Ydim,Xdim);
-    MultidimArray<double>   Y2(Ydim,Xdim);
-    _applyCircularMask(X,X2);
-    _applyCircularMask(Y,Y2);
+    //    // anterior
+    //    MultidimArray<double>   X2(Ydim,Xdim);
+    //    MultidimArray<double>   Y2(Ydim,Xdim);
+    //    _applyCircularMask(X,X2);
+    //    _applyCircularMask(Y,Y2);
+
+    // hanning images
+    hannWindow(X2);
+    hannWindow(Y2);
+
     // covariance
     double X_m, Y_m, X_std, Y_std;
     arithmetic_mean_and_stddev(X2, X_m, X_std);
@@ -824,6 +835,23 @@ double quadInterp(const int Idx, MultidimArray<double> &in){
     return InterpIdx;
 }
 
+/* precompute Hann 2D window Ydim x Xdim*/
+void ProgAngularAssignmentMag::computeHann(){
+    float pi = 3.141592653;
+    W.resizeNoCopy(Ydim,Xdim);
+    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(W){
+        dAij(W,i,j)=0.25*(1-cos(2*pi*i/Xdim))*(1-cos(2*pi*j/Ydim));
+    }
+}
+
+/*apply hann window to input image*/
+void ProgAngularAssignmentMag::hannWindow(MultidimArray<double> &in)
+{
+    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(in){
+        dAij(in,i,j)*=dAij(W,i,j);
+    }
+}
+
 /* Only for 180 angles */
 /* approach which selects only two locations of maximum peaks in ccvRot */
 void ProgAngularAssignmentMag::rotCandidates3(MultidimArray<double> &in,
@@ -1035,6 +1063,7 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
     MDaRefRot.setXmippOrigin();
     for(int i = 0; i < peaksFound; i++){
         rotVar = -1. * cand[i]; //
+        //aplico rotación a imagen referencia (ya viene hanneada)
         _applyRotation(MDaRef,rotVar,MDaRefRot);
         _applyFourierImage2(MDaRefRot,MDaRefRotF);
         ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix

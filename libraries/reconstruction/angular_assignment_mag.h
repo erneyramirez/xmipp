@@ -83,6 +83,9 @@ public: // Internal members
     MultidimArray<double> axTx;
     MultidimArray<double> axTy;
 
+    // Hann window
+    MultidimArray<double> W;
+
     // CCV result matrix
     MultidimArray<double>                   ccMatrixRot;
     MultidimArray<double>                   ccVectorRot;
@@ -153,7 +156,7 @@ public:
 
 private:
     void printSomeValues(MultidimArray<double> & MDa);
-    void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void pearsonCorr(MultidimArray<double> X2, MultidimArray<double> Y2, double &coeff);
     void arithmetic_mean_and_stddev(MultidimArray<double> &data, double &avg, double &stddev);
     double mean_of_products(MultidimArray<double> &data1, MultidimArray<double> &data2);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName);
@@ -189,6 +192,8 @@ private:
     void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size, const double &oldAngle);
     void meanByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void meanByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
+    void hannWindow(MultidimArray<double> &in);
+    void computeHann();
 };
 //@}
 
