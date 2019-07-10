@@ -718,30 +718,32 @@ int dummy(){}
 def configCuda(configDict):
     configDict["CUDA"] = os.environ.get("CUDA", "")
     if configDict["CUDA"]=="":
-        if checkProgram("nvcc", False):
-            configDict["CUDA"]="True"
-        else:
-            configDict["CUDA"]="False"
+        configDict["CUDA"] = "True" if checkProgram("nvcc", False) else configDict["CUDA"]="False"
+
     if configDict["CUDA"]=="True":
-        if configDict["NVCC"]=="":
-            if checkProgram("nvcc"):
-                nvccVersion, nvccFullVersion = getCudaVersion("nvcc")
-                if nvccVersion != 8.0:
-                    print(red('Detected CUDA-' + nvccFullVersion + '. Version 8.0 is required.'))
-                    print(red("Skipping CUDA compilation. Please, set cuda-8.0 as default "
-                              "to be able to use Xmipp Cuda programs.'"))
-                    configDict["CUDA"] = 'False'
-                    return
-                configDict["NVCC"] = "nvcc"
+        nvcc = configDict["NVCC"] if configDict["NVCC"] != "" else 'nvcc'
+        if checkProgram(nvcc):
+            nvccVersion, nvccFullVersion = getCudaVersion(nvcc)
+            if nvccVersion < 8.0:
+                print(red('Detected CUDA-' + nvccFullVersion + '. Version 8.0 (or latter) is required.'))
+                print(red("Skipping CUDA compilation. Please, set cuda>8.0 as default and run ./xmipp config again "
+                          "to be able to use Xmipp Cuda programs.'"))
+                configDict["CUDA"] = 'False'
+                return
+            print("%s V%s detected" % (nvcc, nvccFullVersion))
+            configDict["NVCC"] = nvcc
+        else:
+            configDict["NVCC"] = ''
+            return
         if configDict["NVCC_CXXFLAGS"]=="":
             # in case user specified some wrapper of the compiler
             # get rid of it: 'ccache g++' -> 'g++'
             candidate = configDict["CXX"].split()[-1]
             cxxVersion, cxxStrVersion = getGccVersion(candidate)
-            if cxxVersion >= 6:
+            if cxxVersion >= 6 and nvccVersion == 8:
                 compVers = ['5', '5.5', '5.4', '5.3', '5.2', '5.1', '4.9', '4.8']
-                print(red("%s version later than 5 detected. Looking for an alternative "
-                          "for CUDA compilations... (g++-v: %s)"
+                print(red("%s version later than 5 detected (incompatible with cuda8.0). "
+                          "Looking for an alternative for CUDA compilations... (g++-v: %s)"
                           % (candidate, ', '.join(compVers))))
                 for ver in compVers:
                     cxxCudaVer = '-'+ver
