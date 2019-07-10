@@ -718,7 +718,7 @@ int dummy(){}
 def configCuda(configDict):
     configDict["CUDA"] = os.environ.get("CUDA", "")
     if configDict["CUDA"]=="":
-        configDict["CUDA"] = "True" if checkProgram("nvcc", False) else configDict["CUDA"]="False"
+        configDict["CUDA"] = "True" if checkProgram("nvcc", False) else "False"
 
     if configDict["CUDA"]=="True":
         nvcc = configDict["NVCC"] if configDict["NVCC"] != "" else 'nvcc'
