@@ -83,6 +83,9 @@ public: // Internal members
     MultidimArray<double> axTx;
     MultidimArray<double> axTy;
 
+    // Hann window
+    MultidimArray<double> W;
+
     // CCV result matrix
     MultidimArray<double>                   ccMatrixRot;
     MultidimArray<double>                   ccVectorRot;
@@ -153,7 +156,7 @@ public:
 
 private:
     void printSomeValues(MultidimArray<double> & MDa);
-    void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void pearsonCorr(MultidimArray<double> X2, MultidimArray<double> Y2, double &coeff);
     void arithmetic_mean_and_stddev(MultidimArray<double> &data, double &avg, double &stddev);
     double mean_of_products(MultidimArray<double> &data1, MultidimArray<double> &data2);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName);
@@ -176,7 +179,7 @@ private:
     void _applyShift(MultidimArray<double> &MDaRef, double &tx, double &ty, MultidimArray<double> &MDaRefShift);
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void bestCand2(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
-    void _applyRotationAndShift(MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
+    void _applyRotationAndShift(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
     void rotCandidates2(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
     void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
@@ -189,6 +192,8 @@ private:
     void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size);
     void meanByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void meanByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
+    void hannWindow(MultidimArray<double> &in);
+    void computeHann();
 };
 //@}
 
