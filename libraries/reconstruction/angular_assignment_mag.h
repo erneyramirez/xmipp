@@ -41,6 +41,7 @@
 #include <core/metadata_extension.h>
 #include <core/multidim_array.h>
 #include <data/mask.h>
+#include <data/filters.h>
 // */
 
 #include <vector>
@@ -156,8 +157,10 @@ public:
 
 private:
     void printSomeValues(MultidimArray<double> & MDa);
-    void pearsonCorr(MultidimArray<double> X2, MultidimArray<double> Y2, double &coeff);
+    void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void arithmetic_mean_and_stddev(const MultidimArray<double> &data, double &avg, double &stddev);
     void arithmetic_mean_and_stddev(MultidimArray<double> &data, double &avg, double &stddev);
+    double mean_of_products(const MultidimArray<double> &data1, MultidimArray<double> &data2);
     double mean_of_products(MultidimArray<double> &data1, MultidimArray<double> &data2);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName, size_t nFil, size_t nCol);
@@ -167,7 +170,7 @@ private:
     MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, size_t &start, size_t &stop);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
-    void ccMatrix(const MultidimArray<std::complex<double> > &F1, const MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
+    void ccMatrix(const MultidimArray<std::complex<double> > &F1,const MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
     void selectBands(MultidimArray<double> &in, MultidimArray<double> &out);
     void maxByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
     void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size, int *nPeaksFound);
@@ -194,6 +197,8 @@ private:
     void meanByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
     void hannWindow(MultidimArray<double> &in);
     void computeHann();
+    void _writeTestFile(const MultidimArray<double> &data, const char* fileName,size_t nFil, size_t nCol);
+    void shiftCandidates(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
 };
 //@}
 

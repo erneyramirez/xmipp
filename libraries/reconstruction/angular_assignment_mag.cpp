@@ -113,7 +113,7 @@ void ProgAngularAssignmentMag::preProcess()
 
     startBand=size_t((sampling*Xdim)/100.);
     startBand=(startBand >= n_rad) ? n_rad-16 : startBand;
-    finalBand=size_t((sampling*Xdim)/(sampling*3+1));  // den MaxTargetResolution related
+    finalBand=size_t((sampling*Xdim)/11.);  // den MaxTargetResolution related e.g.  (sampling*3+1)
     finalBand=(finalBand >= n_rad) ? n_rad-1 : finalBand;
 
     n_bands = finalBand - startBand;
@@ -151,7 +151,7 @@ void ProgAngularAssignmentMag::preProcess()
         // processing reference image
         ImgRef.read(fnImgRef);
         MDaRef = ImgRef();
-        hannWindow(MDaRef); //apply hann window to reference image
+                hannWindow(MDaRef); //apply hann window to reference image
         vecMDaRef.push_back(MDaRef);
         _applyFourierImage2(MDaRef, MDaRefF);
         vecMDaRefF.push_back(MDaRefF);
@@ -194,13 +194,16 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     // processing input image
     ImgIn.read(fnImg);
     MDaIn = ImgIn();
-    hannWindow(MDaIn); //apply hann window to input experimental image
+        hannWindow(MDaIn); //apply hann window to input experimental image
     _applyFourierImage2(MDaIn, MDaInF);
     transformerImage.getCompleteFourier(MDaInF2);
     _getComplexMagnitude(MDaInF2, MDaInFM);
     completeFourierShift(MDaInFM, MDaInFMs);
     MDaInFMs_polarPart = imToPolar(MDaInFMs,startBand,finalBand);
     _applyFourierImage2(MDaInFMs_polarPart, MDaInFMs_polarF, n_ang);
+
+    printf("size MDaInFMs_polarF %d x %d\n", int(YSIZE(MDaInFMs_polarF)), int(XSIZE(MDaInFMs_polarF)));
+    std::cin.get();
 
     tempCoeff = -10.0;
     int k = 0;
@@ -209,21 +212,13 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
         // computing relative rotation and traslation
         ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot);
+        printf("size ccMatrixRot %d x %d\n", int(YSIZE(ccMatrixRot)), int(XSIZE(ccMatrixRot)));
+        std::cin.get();
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
         rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound);
         bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
-
-        //        //nuevo enfoque
-        //        getRot(ccVectorRot,bestCandVar,XSIZE(ccVectorRot));
-        //        int tam=2;
-        //        cand.reserve(tam);
-        //        cand[0]=bestCandVar;
-        //        cand[1] =(cand[0]>0) ? cand[0] + 180 : cand[0] - 180 ;
-        //        peaksFound=2;
-        //        bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
-
         // all the results are storaged for posterior partial_sort
         Idx[countRefImg] = k++;
         candidatesFirstLoop[countRefImg] = countRefImg+1;
@@ -231,18 +226,9 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         bestTx[countRefImg] = Tx;
         bestTy[countRefImg] = Ty;
         bestRot[countRefImg] = bestCandVar;
-
-        //        if(countRefImg==0){
-        //            printf("\n");
-        //            for (int ii=0;ii<peaksFound;ii++){
-        //                printf("%.3f\t",cand[ii]);
-        //            }
-        //            printf("\n");
-        //            printf("candidate: %d \tcoeff: %.3f, \tTx: %.3f, \tTy: %.3f, \trot: %.3f\n",
-        //                   candidatesFirstLoop[countRefImg],bestCoeff,Tx,Ty,bestCandVar);
-        //            _writeTestFile(ccMatrixRot,"/home/jeison/Escritorio/z_ccVector.txt",YSIZE(ccMatrixRot),XSIZE(ccMatrixRot));
-        //        }
     }
+
+
 
     //    /*
     // // skip second loop
@@ -251,12 +237,19 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
                       [&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
 
+
+
     double rotRef, tiltRef;
     for(int i = 0; i < nCand; i++){
         // reading info of reference image candidate
         mdRef.getRow(rowRef, size_t( candidatesFirstLoop[ Idx[i] ] ) );
         rowRef.getValue(MDL_ANGLE_ROT, rotRef);
         rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
+
+        //        printf("cand: %d \t rot: %.2f \t tilt: %.2f \t psi: %.2f \t tx: %.2f \t ty: %.2f \t coeff: %.4f\n",
+        //               candidatesFirstLoop[Idx[0]], rotRef, tiltRef, bestRot[Idx[0]],
+        //                bestTx[Idx[0]], bestTy[Idx[0]], candidatesFirstLoopCoeff[Idx[0]]);
+        //        std::cin.get();
 
         //save metadata of images with angles
         rowOut.setValue(MDL_IMAGE,       fnImgOut);
@@ -474,7 +467,7 @@ void ProgAngularAssignmentMag::postProcess(){
 }
 
 /* Pearson Coeff  Revisar luego si es necesario pasar copias o hay alternativa en MultidimArray como un alias o algo asi*/
-void ProgAngularAssignmentMag::pearsonCorr(MultidimArray<double> X2, MultidimArray<double> Y2, double &coeff){
+void ProgAngularAssignmentMag::pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff){
 
     //    // anterior
     //    MultidimArray<double>   X2(Ydim,Xdim);
@@ -482,16 +475,16 @@ void ProgAngularAssignmentMag::pearsonCorr(MultidimArray<double> X2, MultidimArr
     //    _applyCircularMask(X,X2);
     //    _applyCircularMask(Y,Y2);
 
-    // hanning images
-    hannWindow(X2);
-    hannWindow(Y2);
+    //    // hanning images
+    //    hannWindow(X);
+    //    hannWindow(Y);
 
     // covariance
     double X_m, Y_m, X_std, Y_std;
-    arithmetic_mean_and_stddev(X2, X_m, X_std);
-    arithmetic_mean_and_stddev(Y2, Y_m, Y_std);
+    arithmetic_mean_and_stddev(X, X_m, X_std);
+    arithmetic_mean_and_stddev(Y, Y_m, Y_std);
 
-    double mean_prod = mean_of_products(X2, Y2);
+    double mean_prod = mean_of_products(X, Y);
     double covariace = mean_prod - (X_m * Y_m);
 
     coeff = covariace / (X_std * Y_std);
@@ -515,8 +508,24 @@ void ProgAngularAssignmentMag::_applyCircularMask(const MultidimArray<double> &i
 }
 
 /* Arithmetic mean and stdDev for Pearson Coeff */
-void ProgAngularAssignmentMag::arithmetic_mean_and_stddev( MultidimArray<double> &data, double &avg, double &stddev ){
+void ProgAngularAssignmentMag::arithmetic_mean_and_stddev(const MultidimArray<double> &data, double &avg, double &stddev ){
     data.computeAvgStdev(avg, stddev);
+}
+
+/* Arithmetic mean and stdDev for Pearson Coeff */
+void ProgAngularAssignmentMag::arithmetic_mean_and_stddev(MultidimArray<double> &data, double &avg, double &stddev ){
+    data.computeAvgStdev(avg, stddev);
+}
+
+/* Mean of products for Pearson Coeff */
+double ProgAngularAssignmentMag::mean_of_products(const MultidimArray<double> &data1, MultidimArray<double> &data2){
+    double total = 0;
+    for (int f = 0; f < Ydim; f++){
+        for (int c = 0; c < Xdim; c++){
+            total += DIRECT_A2D_ELEM(data1,f,c) * DIRECT_A2D_ELEM(data2,f,c);
+        }
+    }
+    return total/(Xdim*Ydim);
 }
 
 /* Mean of products for Pearson Coeff */
@@ -532,6 +541,19 @@ double ProgAngularAssignmentMag::mean_of_products(MultidimArray<double> &data1, 
 
 /* writing out some data to file with an specified size*/
 void ProgAngularAssignmentMag::_writeTestFile(MultidimArray<double> &data, const char* fileName,
+                                              size_t nFil, size_t nCol){
+    std::ofstream outFile(fileName);
+    for (int f = 0; f < nFil; f++){
+        for (int c = 0; c < nCol; c++){
+            outFile <<  DIRECT_A2D_ELEM(data,f,c) << "\t";
+        }
+        outFile << "\n";
+    }
+    outFile.close();
+}
+
+/* writing out some data to file with an specified size*/
+void ProgAngularAssignmentMag::_writeTestFile(const MultidimArray<double> &data, const char* fileName,
                                               size_t nFil, size_t nCol){
     std::ofstream outFile(fileName);
     for (int f = 0; f < nFil; f++){
@@ -735,6 +757,10 @@ void ProgAngularAssignmentMag::ccMatrix(const MultidimArray< std::complex<double
 
 
     result.resizeNoCopy(YSIZE(F1),2*(XSIZE(F1)-1));
+
+    printf("size result %d x %d\n", int(YSIZE(result)), int(XSIZE(result)));
+    std::cin.get();
+
 
     //    CorrelationAux aux2;
     //    correlation_matrix(F1,F2,result,aux2);
@@ -986,6 +1012,56 @@ void ProgAngularAssignmentMag::rotCandidates3(MultidimArray<double> &in,
     }
 }
 
+/* approach which selects only two locations of maximum peaks in ccvShift */
+void ProgAngularAssignmentMag::shiftCandidates(MultidimArray<double> &in,
+                                              std::vector<double> &cand,
+                                              const size_t &size, int *nPeaksFound){
+    double max1 = -10.;
+    int idx1 = 0;
+    double max2 = -10.;
+    int idx2 = 0;
+    int i;
+    int cont = 0;
+    *(nPeaksFound) = cont;
+
+    for(i = 0; i < size; i++){ // only look for in range 90:-90
+        // current value is a peak value?
+        if ( (dAi(in,i) > dAi(in,i-1)) && (dAi(in,i) > dAi(in,i+1)) ){
+            cont++;
+            if( dAi(in,i) > max1){
+                max2 = max1;
+                idx2 = idx1;
+                max1 = dAi(in,i);
+                idx1 = i;
+            }
+            else if( dAi(in,i) > max2 && dAi(in,i) != max1 ){
+                max2 = dAi(in,i);
+                idx2 = i;
+            }
+        }
+    }
+    int maxAccepted = 2;
+    maxAccepted = ( cont < maxAccepted) ? cont : maxAccepted;
+    if(cont){
+        std::vector<int> temp(2,0);
+        temp[0] = idx1;
+        temp[1] = idx2;
+        int tam = maxAccepted;
+        *(nPeaksFound) = tam;
+        cand.reserve(tam);
+        double interpIdx; // quadratic interpolated location of peak
+        for(i = 0; i < maxAccepted; i++){
+            interpIdx = quadInterp(temp[i], in);
+            cand[i] =  double( size - 1 )/2. - interpIdx;
+            cand[i] *=-1;
+            //            cand[i+maxAccepted] =(cand[i]>0) ? cand[i] + 180 : cand[i] - 180 ;
+        }
+    }
+    else{
+        *(nPeaksFound) = 0;
+    }
+}
+
 /* approach which selects only two locations of maximum peaks in ccvRot */
 void ProgAngularAssignmentMag::rotCandidates2(MultidimArray<double> &in,
                                               std::vector<double> &cand,
@@ -1174,29 +1250,27 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
     MDaRefRot.setXmippOrigin();
     for(int i = 0; i < peaksFound; i++){
         rotVar = -1. * cand[i]; //
-        //aplico rotación a imagen referencia (ya viene hanneada)
+        //aplico rotación a imagen referencia
         _applyRotation(MDaRef,rotVar,MDaRefRot);
-
-        //        //nuevo enfoque aplicando mascara circular
-        //        _applyCircularMask(MDaRefRot,MDaRefRotMasked);
-        //        _applyFourierImage2(MDaRefRotMasked,MDaRefRotF);
-        //        _applyCircularMask(MDaIn,MDaInMasked);
-        //        _applyFourierImage2(MDaInMasked,MDaInMaskedF);
-        //        ccMatrix(MDaInMaskedF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix
-
+        //fourier
         _applyFourierImage2(MDaRefRot,MDaRefRotF);
+        printf("size MDaRefRotF %d x %d\n", int(YSIZE(MDaRefRotF)), int(XSIZE(MDaRefRotF)));
+        std::cin.get();
         //        shift relativo entre entrada y referencia rotada
         ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix
-
-        //_writeTestFile(ccMatrixShift,"/home/jeison/Escritorio/z_ccMatrixShift.txt",YSIZE(ccMatrixShift),XSIZE(ccMatrixShift));
-        //        exit(1);
-
+        printf("size ccMatrixShift %d x %d\n", int(YSIZE(ccMatrixShift)), int(XSIZE(ccMatrixShift)));
+        std::cin.get();
         maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
         getShift(ccVectorTx,tx,XSIZE(ccMatrixShift));
+        printf("size ccVectorTx %d x %d\n", int(YSIZE(ccVectorTx)), int(XSIZE(ccVectorTx)));
+        std::cin.get();
         tx = -1. * tx;
         maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
         getShift(ccVectorTy,ty,YSIZE(ccMatrixShift));
+        printf("size ccVectorTy %d x %d\n", int(YSIZE(ccVectorTy)), int(XSIZE(ccVectorTy)));
+        std::cin.get();
         ty = -1. * ty;
+        // descomentar luego
         if ( std::abs(tx)>maxShift || std::abs(ty)>maxShift )
             continue;
 
@@ -1208,10 +1282,60 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         //nuevo enfoque aplicando shift y rotación hallados a la imagen de referencia original
         // al parecer no se gana mucho, pero igual creo que es la forma correcta
         _applyRotationAndShift(MDaRef,rotVar,tx,ty,MDaRefShiftRot);
-
-        //cambiar en pearson porque mdain ya viene hanneada, solo faltaría hannear acá a mdarefRotShift
+        //hann a MDaRefShiftRot
+        hannWindow(MDaRefShiftRot);
+        //        // pearson
         pearsonCorr(MDaIn, MDaRefShiftRot, tempCoeff);
-        //printf("\ndespués:\nrotval: %.3f \t tx: %.3f \t ty: %.3f \t corr: %.3f \n",rotVar,tx,ty,tempCoeff);
+        //        tempCoeff=mutualInformation(MDaIn,MDaRefShiftRot);
+
+
+
+        if ( tempCoeff > *(bestCoeff) ){
+            *(bestCoeff) = tempCoeff;
+            *(shift_x) = tx;
+            *(shift_y) = ty;
+            *(bestCandRot) = rotVar;
+        }
+
+        //        //prueba
+        //        maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
+        //        maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
+        //        std::vector<double> posTx;
+        //        std::vector<double> posTy;
+        //        int pkf=0;
+        //        shiftCandidates(ccVectorTx,posTx,XSIZE(ccMatrixShift),&pkf);
+        //        pkf=0;
+        //        shiftCandidates(ccVectorTy,posTy,YSIZE(ccMatrixShift),&pkf);
+        //        // test
+        //        double tempCoeff1,tempCoeff2;
+        //        _applyRotationAndShift(MDaRef,rotVar,posTx[0],posTy[0],MDaRefShiftRot);
+        //        pearsonCorr(MDaIn, MDaRefShiftRot, tempCoeff1);
+        //        if ( tempCoeff1 > *(bestCoeff) ){
+        //            *(bestCoeff) = tempCoeff1;
+        //            *(shift_x) = posTx[0];
+        //            *(shift_y) = posTy[0];
+        //            *(bestCandRot) = rotVar;
+        //        }
+        //        _applyRotationAndShift(MDaRef,rotVar,posTx[1],posTy[1],MDaRefShiftRot);
+        //        pearsonCorr(MDaIn, MDaRefShiftRot, tempCoeff2);
+        //        if ( tempCoeff2 > *(bestCoeff) ){
+        //            *(bestCoeff) = tempCoeff2;
+        //            *(shift_x) = posTx[1];
+        //            *(shift_y) = posTy[1];
+        //            *(bestCandRot) = rotVar;
+        //        }
+
+
+
+        //        // borrar
+        //        std::cout << "Press \n";
+        //        //debug correlation vectors for shift finding
+        //        _writeTestFile(ccVectorTx,"/home/jeison/Escritorio/zz_ccVectorTx.txt",YSIZE(ccVectorTx),XSIZE(ccVectorTx));
+        //        _writeTestFile(ccVectorTy,"/home/jeison/Escritorio/zz_ccVectorTy.txt",YSIZE(ccVectorTy),XSIZE(ccVectorTy));
+        //        //write involved images
+        //        _writeTestFile(MDaIn,"/home/jeison/Escritorio/zz_mdaIn.txt",YSIZE(MDaIn),XSIZE(MDaIn));
+        //        _writeTestFile(MDaRef,"/home/jeison/Escritorio/zz_mdaRef.txt",YSIZE(MDaRef),XSIZE(MDaRef));
+        //        std::cin.get();
 
         /*
         // before compute pearson coeff, search rotation again using polar representation of images
@@ -1257,12 +1381,6 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         //        printf("despues:\nrotval: %.3f \t tx: %.3f \t ty: %.3f \t corr: %.5f \n",rotVar,tx,ty,tempCoeff);
         // */
 
-        if ( tempCoeff > *(bestCoeff) ){
-            *(bestCoeff) = tempCoeff;
-            *(shift_x) = tx;
-            *(shift_y) = ty;
-            *(bestCandRot) = rotVar;
-        }
     }
 }
 
