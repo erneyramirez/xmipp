@@ -202,8 +202,8 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     MDaInFMs_polarPart = imToPolar(MDaInFMs,startBand,finalBand);
     _applyFourierImage2(MDaInFMs_polarPart, MDaInFMs_polarF, n_ang);
 
-    printf("size MDaInFMs_polarF %d x %d\n", int(YSIZE(MDaInFMs_polarF)), int(XSIZE(MDaInFMs_polarF)));
-    std::cin.get();
+    //    printf("size MDaInFMs_polarF %d x %d\n", int(YSIZE(MDaInFMs_polarF)), int(XSIZE(MDaInFMs_polarF)));
+    //    std::cin.get();
 
     tempCoeff = -10.0;
     int k = 0;
@@ -212,8 +212,8 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
         // computing relative rotation and traslation
         ccMatrix(MDaInFMs_polarF, vecMDaRefFMs_polarF[countRefImg], ccMatrixRot);
-        printf("size ccMatrixRot %d x %d\n", int(YSIZE(ccMatrixRot)), int(XSIZE(ccMatrixRot)));
-        std::cin.get();
+        //        printf("size ccMatrixRot %d x %d\n", int(YSIZE(ccMatrixRot)), int(XSIZE(ccMatrixRot)));
+        //        std::cin.get();
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
@@ -758,8 +758,8 @@ void ProgAngularAssignmentMag::ccMatrix(const MultidimArray< std::complex<double
 
     result.resizeNoCopy(YSIZE(F1),2*(XSIZE(F1)-1));
 
-    printf("size result %d x %d\n", int(YSIZE(result)), int(XSIZE(result)));
-    std::cin.get();
+    //    printf("size result %d x %d\n", int(YSIZE(result)), int(XSIZE(result)));
+    //    std::cin.get();
 
 
     //    CorrelationAux aux2;
@@ -1254,21 +1254,21 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         _applyRotation(MDaRef,rotVar,MDaRefRot);
         //fourier
         _applyFourierImage2(MDaRefRot,MDaRefRotF);
-        printf("size MDaRefRotF %d x %d\n", int(YSIZE(MDaRefRotF)), int(XSIZE(MDaRefRotF)));
-        std::cin.get();
+        //        printf("size MDaRefRotF %d x %d\n", int(YSIZE(MDaRefRotF)), int(XSIZE(MDaRefRotF)));
+        //        std::cin.get();
         //        shift relativo entre entrada y referencia rotada
         ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift);// cross-correlation matrix
-        printf("size ccMatrixShift %d x %d\n", int(YSIZE(ccMatrixShift)), int(XSIZE(ccMatrixShift)));
-        std::cin.get();
+        //        printf("size ccMatrixShift %d x %d\n", int(YSIZE(ccMatrixShift)), int(XSIZE(ccMatrixShift)));
+        //        std::cin.get();
         maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
         getShift(ccVectorTx,tx,XSIZE(ccMatrixShift));
-        printf("size ccVectorTx %d x %d\n", int(YSIZE(ccVectorTx)), int(XSIZE(ccVectorTx)));
-        std::cin.get();
+        //        printf("size ccVectorTx %d x %d\n", int(YSIZE(ccVectorTx)), int(XSIZE(ccVectorTx)));
+        //        std::cin.get();
         tx = -1. * tx;
         maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
         getShift(ccVectorTy,ty,YSIZE(ccMatrixShift));
-        printf("size ccVectorTy %d x %d\n", int(YSIZE(ccVectorTy)), int(XSIZE(ccVectorTy)));
-        std::cin.get();
+        //        printf("size ccVectorTy %d x %d\n", int(YSIZE(ccVectorTy)), int(XSIZE(ccVectorTy)));
+        //        std::cin.get();
         ty = -1. * ty;
         // descomentar luego
         if ( std::abs(tx)>maxShift || std::abs(ty)>maxShift )
