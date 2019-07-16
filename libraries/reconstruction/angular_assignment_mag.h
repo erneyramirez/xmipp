@@ -86,6 +86,8 @@ public: // Internal members
 
     // Hann window
     MultidimArray<double> W;
+    // circular mask
+    MultidimArray<double> C;
 
     // CCV result matrix
     MultidimArray<double>                   ccMatrixRot;
@@ -199,6 +201,8 @@ private:
     void computeHann();
     void _writeTestFile(const MultidimArray<double> &data, const char* fileName,size_t nFil, size_t nCol);
     void shiftCandidates(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
+    void circularWindow(MultidimArray<double> &in);
+    void computeCircular();
 };
 //@}
 

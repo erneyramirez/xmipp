@@ -266,6 +266,8 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     // */
 
     // /* SEGUNDO LOOP SOBRE UN PORCENTAJE DE LAS IMAGENES. METODO IGUAL AL LOOP ANTERIOR
+    // evaluar luego el aporte de este segundo loop, por ejemplo, contando las mejoras en ccCoeff
+    // y si estos aumentos valen la pena respecto al tiempo que tarda
     // choose nCand of the candidates with best corrCoeff for second loop candidate search.
     // for example 30%... select better
     int nCand = int(.3*sizeMdRef+1);
@@ -356,15 +358,11 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
     rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
     rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
-
-
     rowOut.setValue(MDL_ANGLE_PSI,   bestRot2[Idx2[0]]);
-
-    // anterior
     rowOut.setValue(MDL_SHIFT_X,     -1. * bestTx2[Idx2[0]]);
     rowOut.setValue(MDL_SHIFT_Y,     -1. * bestTy2[Idx2[0]]);
 
-    //    // nuevo
+    //    // nuevo: esto no es correcto, porque la transformación la aplico en un paso a la imagen ref original
     //    double Ftx, Fty, Fang, radAng, cosine, sine;
     //    Fang= bestRot2[Idx2[0]];
     //    radAng= DEG2RAD(Fang);
@@ -378,18 +376,64 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     //    rowOut.setValue(MDL_SHIFT_Y,     -1. * Fty);
 
 
-    // escribir imagenes para probar
-    _applyRotationAndShift(vecMDaRef[ Idx[0] ], bestRot2[ Idx[0] ], bestTx2[ Idx[0] ], bestTy2[ Idx[0] ], MDaRefTrans);
-    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_refTrans.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
-    _writeTestFile(MDaIn,"/home/jeison/Escritorio/zz_exp.txt",YSIZE(MDaIn),XSIZE(MDaIn));
+    //    // escribir imagenes para probar lo relacionado con las rotaciones
+    //    _applyRotationAndShift(vecMDaRef[ Idx[0] ], bestRot2[ Idx[0] ], bestTx2[ Idx[0] ], bestTy2[ Idx[0] ], MDaRefTrans);
+    //    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_refTrans.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
+    //    _writeTestFile(MDaIn,"/home/jeison/Escritorio/zz_exp.txt",YSIZE(MDaIn),XSIZE(MDaIn));
 
-    double newRot, newTx, newTy;
-    newRot= -1* bestRot2[ Idx[0] ];
-    newTx= -1*bestTx2[ Idx[0] ];
-    newTy= -1*bestTy2[ Idx[0] ];
-    _applyRotationAndShift(MDaIn, newRot, newTx, newTy, MDaRefTrans);
-    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_expTrans.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
-    _writeTestFile(vecMDaRef[ Idx[0] ],"/home/jeison/Escritorio/zz_ref.txt",YSIZE(vecMDaRef[ Idx[0] ]),XSIZE(vecMDaRef[ Idx[0] ]));
+    //    double newRot, newTx, newTy;
+    //    newRot= -1* bestRot2[ Idx[0] ];
+    //    newTx= -1*bestTx2[ Idx[0] ];
+    //    newTy= -1*bestTy2[ Idx[0] ];
+    //    _applyRotationAndShift(MDaIn, newRot, newTx, newTy, MDaRefTrans);
+    //    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_expTrans.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
+    //    _writeTestFile(vecMDaRef[ Idx[0] ],"/home/jeison/Escritorio/zz_ref.txt",YSIZE(vecMDaRef[ Idx[0] ]),XSIZE(vecMDaRef[ Idx[0] ]));
+
+
+    //    // Transform matrix
+    //    Matrix2D<double> A(3,3);
+    //    A.initIdentity();
+    //    double ang, cosine, sine;
+    //    ang = DEG2RAD(bestRot2[Idx2[0]]);
+    //    cosine = cos(ang);
+    //    sine = sin(ang);
+    //    // rotation
+    //    MAT_ELEM(A,0, 0) = cosine;
+    //    MAT_ELEM(A,0, 1) = sine;
+    //    MAT_ELEM(A,1, 0) = -sine;
+    //    MAT_ELEM(A,1, 1) = cosine;
+    //    // Shift
+    //    MAT_ELEM(A,0, 2) = bestTx2[Idx2[0]];
+    //    MAT_ELEM(A,1, 2) = bestTy2[Idx2[0]];
+
+    //    A=A.inv();
+
+    //    double scale, shiftX, shiftY, anglePsi;
+    //    bool flip;
+    //    transformationMatrix2Parameters2D(A,flip,scale,shiftX,shiftY,anglePsi);
+
+    //    double rotRef, tiltRef;
+    //    // reading info of reference image candidate
+    //    mdRef.getRow(rowRef, size_t( candidatesFirstLoop2[ Idx2[0] ] ) );
+    //    rowRef.getValue(MDL_ANGLE_ROT, rotRef);
+    //    rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
+    //    //save metadata of images with angles
+    //    rowOut.setValue(MDL_IMAGE,       fnImgOut);
+    //    rowOut.setValue(MDL_ENABLED,     1);
+    //    rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop2[ Idx2[0] ]));
+    //    rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff2[Idx2[0]]);
+    //    rowOut.setValue(MDL_WEIGHT,      1.);
+    //    rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
+    //    rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
+    //    rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+
+
+    //    rowOut.setValue(MDL_ANGLE_PSI,   anglePsi);
+    //    rowOut.setValue(MDL_SHIFT_X,     -shiftX);
+    //    rowOut.setValue(MDL_SHIFT_Y,     -shiftY);
+    //    rowOut.setValue(MDL_FLIP,        flip);
+
+
 
 
     // */
@@ -909,14 +953,14 @@ void ProgAngularAssignmentMag::ccMatrix(const MultidimArray< std::complex<double
         b=(*(ptrFFT1+1))*dSize;
         c=(*ptrFFT2++);
         d=(*ptrFFT2++)*(-1); //(-1);
-        //GCC
-        *ptrFFT1++ = a*c-b*d;
-        *ptrFFT1++ = b*c+a*d;
-        //        // // for Compactly supported correlation
-        //        // F2 is reference image
-        //        *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
-        //        *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
-        //        //phase correlation only
+        //        //GCC
+        //        *ptrFFT1++ = a*c-b*d;
+        //        *ptrFFT1++ = b*c+a*d;
+        // // for Compactly supported correlation
+        // F2 is reference image
+        *ptrFFT1++ = (a*c-b*d)/((c*c+d*d)+0.001);
+        *ptrFFT1++ = (b*c+a*d)/((c*c+d*d)+0.001);
+        //phase correlation only
         //        double den = (a*c-b*d)*(a*c-b*d) + (b*c+a*d)*(b*c+a*d);
         //        *ptrFFT1++ = (a*c-b*d)/(den+0.001);
         //        *ptrFFT1++ = (b*c+a*d)/(den+0.001);
