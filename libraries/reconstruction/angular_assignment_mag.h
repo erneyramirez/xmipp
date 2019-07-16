@@ -41,6 +41,7 @@
 #include <core/metadata_extension.h>
 #include <core/multidim_array.h>
 #include <data/mask.h>
+#include <data/filters.h>
 // */
 
 #include <vector>
@@ -85,6 +86,8 @@ public: // Internal members
 
     // Hann window
     MultidimArray<double> W;
+    // circular mask
+    MultidimArray<double> C;
 
     // CCV result matrix
     MultidimArray<double>                   ccMatrixRot;
@@ -156,8 +159,10 @@ public:
 
 private:
     void printSomeValues(MultidimArray<double> & MDa);
-    void pearsonCorr(MultidimArray<double> X2, MultidimArray<double> Y2, double &coeff);
+    void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void arithmetic_mean_and_stddev(const MultidimArray<double> &data, double &avg, double &stddev);
     void arithmetic_mean_and_stddev(MultidimArray<double> &data, double &avg, double &stddev);
+    double mean_of_products(const MultidimArray<double> &data1, MultidimArray<double> &data2);
     double mean_of_products(MultidimArray<double> &data1, MultidimArray<double> &data2);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName, size_t nFil, size_t nCol);
@@ -179,7 +184,7 @@ private:
     void _applyShift(MultidimArray<double> &MDaRef, double &tx, double &ty, MultidimArray<double> &MDaRefShift);
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void bestCand2(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
-    void _applyRotationAndShift(MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
+    void _applyRotationAndShift(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
     void rotCandidates2(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
     void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData);
     void _applyFourierImage2(MultidimArray<double> &data, MultidimArray<std::complex<double> > &FourierData, const size_t &ang);
@@ -189,11 +194,15 @@ private:
     void _applyCircularMask(const MultidimArray<double> &in, MultidimArray<double> &out);
     void newApplyGeometry(MultidimArray<double> &in, MultidimArray<double> &out, const double &a, const double &b, const double &c, const double &d, const double &tx, const double &ty);
     void ccMatrixPCO(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
-    void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size, const double &oldAngle);
+    void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size);
     void meanByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void meanByColumn(MultidimArray<double> &in, MultidimArray<double> &out);
     void hannWindow(MultidimArray<double> &in);
     void computeHann();
+    void _writeTestFile(const MultidimArray<double> &data, const char* fileName,size_t nFil, size_t nCol);
+    void shiftCandidates(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
+    void circularWindow(MultidimArray<double> &in);
+    void computeCircular();
 };
 //@}
 
