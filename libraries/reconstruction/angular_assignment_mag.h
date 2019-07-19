@@ -203,8 +203,8 @@ public:
     void _writeTestFile(const MultidimArray<double> &data, const char* fileName,size_t nFil, size_t nCol);
     void shiftCandidates(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
     void circularWindow(MultidimArray<double> &in);
-    void computeCircular();
-
+    void computeCircular();    
+    void zncc_coeff(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
 
 private:
 //    void printSomeValues(MultidimArray<double> & MDa);

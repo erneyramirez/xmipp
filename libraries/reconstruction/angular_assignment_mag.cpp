@@ -110,11 +110,13 @@ void ProgAngularAssignmentMag::preProcess()
     // some constants
     n_rad = size_t(Xdim/2 + 0.5);
 
-
     startBand=size_t((sampling*Xdim)/100.);
     startBand=(startBand >= n_rad) ? n_rad-16 : startBand;
     finalBand=size_t((sampling*Xdim)/(sampling*3));  // den MaxTargetResolution related e.g.  (sampling*3+1) or 11.
     finalBand=(finalBand >= n_rad) ? n_rad-1 : finalBand;
+
+    //    startBand = 0;
+    //    finalBand = n_rad-1;
 
     n_bands = finalBand - startBand;
 
@@ -150,6 +152,7 @@ void ProgAngularAssignmentMag::preProcess()
         // processing reference image
         ImgRef.read(fnImgRef);
         MDaRef = ImgRef();
+        //MDaRef.setXmippOrigin(); // adding .setXmippOrigin. seems not necessary
         vecMDaRef.push_back(MDaRef);
         _applyFourierImage2(MDaRef, MDaRefF);
         vecMDaRefF.push_back(MDaRefF);
@@ -293,7 +296,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
         maxByColumn(ccMatrixRot, ccVectorRot);
         peaksFound = 0;
         std::vector<double>().swap(cand);
-        rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); //rotcandidates3 or rotCandidates
+        rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound); //rotcandidates3 or rotCandidates
         bestCand(MDaIn, MDaInF, MDaRefTrans, cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
         // if its better then update
         if(bestCoeff >= candidatesFirstLoopCoeff[Idx[i]]){
@@ -313,12 +316,12 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
             bestRot2[i] = rotVal;
         }
     }
-    nCand = 1;
+    nCand = 3;
     std::partial_sort(Idx2.begin(), Idx2.begin()+nCand, Idx2.end(),
                       [&](int i, int j){return candidatesFirstLoopCoeff2[i] > candidatesFirstLoopCoeff2[j]; });
 
     //    double rotRef, tiltRef;
-    //    // reading info of reference image best candidate
+    //    // reading info of reference image candidate
     //    mdRef.getRow(rowRef, size_t( candidatesFirstLoop2[ Idx2[0] ] ) );
     //    rowRef.getValue(MDL_ANGLE_ROT, rotRef);
     //    rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
@@ -331,91 +334,88 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     //    rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
     //    rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
     //    rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+
     //    rowOut.setValue(MDL_ANGLE_PSI,   bestRot2[Idx2[0]]);
     //    rowOut.setValue(MDL_SHIFT_X,     -1. * bestTx2[Idx2[0]]);
     //    rowOut.setValue(MDL_SHIFT_Y,     -1. * bestTy2[Idx2[0]]);
 
-
-    // Transform matrix
-    Matrix2D<double> A(3,3);
-    A.initIdentity();
-    double ang, cosine, sine;
-    ang = DEG2RAD(bestRot2[Idx2[0]]);
-    cosine = cos(ang);
-    sine = sin(ang);
-    // rotation
-    MAT_ELEM(A,0, 0) = cosine;
-    MAT_ELEM(A,0, 1) = sine;
-    MAT_ELEM(A,1, 0) = -sine;
-    MAT_ELEM(A,1, 1) = cosine;
-    // Shift
-    MAT_ELEM(A,0, 2) = bestTx2[Idx2[0]];
-    MAT_ELEM(A,1, 2) = bestTy2[Idx2[0]];
-
-    A=A.inv();
-
-    // en caso de que esta sea la forma correcta (lo cual debería ser)
-    // el ángulo en el protocolo debería ser el negativo del que ya calculé
-    // aunque normalmente le estaba pasando el mismo ángulo
-    // lo anterior se puede dar por una diferencia en el marco de referencia usado
-    // entre las transformaciones y el calculo de parámetros
-    // y el marco de referencia usado en la reconstrucción o del programa que lee los
-    // parámetros del metadata para luego reconstruir
-
-    // entonces no calcular toda la inversa sino lo relacionado solo con los shiftX y shiftY
-
-    double scale, shiftX, shiftY, anglePsi;
-    bool flip;
-    transformationMatrix2Parameters2D(A,flip,scale,shiftX,shiftY,anglePsi);
-
-    // escribiendo cosas
-    // escribir imagenes para probar lo relacionado con las rotaciones
-    _applyRotationAndShift(vecMDaRef[ Idx[0] ], bestRot2[ Idx[0] ], bestTx2[ Idx[0] ], bestTy2[ Idx[0] ], MDaRefTrans);
-    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_refTrans.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
-    _writeTestFile(MDaIn,"/home/jeison/Escritorio/zz_exp.txt",YSIZE(MDaIn),XSIZE(MDaIn));
-
-    double newRot, newTx, newTy;
-    newRot= -1* bestRot2[ Idx[0] ];
-    newTx= -1*bestTx2[ Idx[0] ];
-    newTy= -1*bestTy2[ Idx[0] ];
-    _applyRotationAndShift(MDaIn, newRot, newTx, newTy, MDaRefTrans);
-    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_expTrans.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
-    _writeTestFile(vecMDaRef[ Idx[0] ],"/home/jeison/Escritorio/zz_ref.txt",YSIZE(vecMDaRef[ Idx[0] ]),XSIZE(vecMDaRef[ Idx[0] ]));
-
-    // angulos y shifts
-    _applyRotationAndShift(MDaIn, anglePsi, shiftX, shiftY, MDaRefTrans);
-    _writeTestFile(MDaRefTrans,"/home/jeison/Escritorio/zz_expTransInverseParam.txt",YSIZE(MDaRefTrans),XSIZE(MDaRefTrans));
-
-    printf("align reference to experimental with: \n bestRot: %.2f \t bestTx: %.2f \t bestTy: %.2f \n",
-           bestRot2[ Idx[0] ], bestTx2[ Idx[0] ], bestTy2[ Idx[0] ]);
-
-    printf("align experimental to reference with: \n -bestRot: %.2f \t -bestTx: %.2f \t -bestTy: %.2f \n",
-           newRot, newTx, newTy);
-
-    printf("align experimental to reference with: \n anglePsi: %.2f \t shiftX: %.2f \t shiftY: %.2f \n",
-           anglePsi, shiftX, shiftY);
-
-
-
-
+    MetaData &ptrMdOut=*getOutputMd();
+    MDRow row;
     double rotRef, tiltRef;
-    // reading info of reference image candidate
-    mdRef.getRow(rowRef, size_t( candidatesFirstLoop2[ Idx2[0] ] ) );
-    rowRef.getValue(MDL_ANGLE_ROT, rotRef);
-    rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
-    //save metadata of images with angles
-    rowOut.setValue(MDL_IMAGE,       fnImgOut);
-    rowOut.setValue(MDL_ENABLED,     1);
-    rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop2[ Idx2[0] ]));
-    rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff2[Idx2[0]]);
-    rowOut.setValue(MDL_WEIGHT,      1.);
-    rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
-    rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
-    rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+    for (int i=0; i<nCand; i++){
+        mdRef.getRow(rowRef, size_t( candidatesFirstLoop2[ Idx2[i] ] ) );
+        rowRef.getValue(MDL_ANGLE_ROT, rotRef);
+        rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
+        size_t recId=ptrMdOut.addRow(rowOut);
+        //save metadata of images with angles
+        ptrMdOut.setValue(MDL_IMAGE,       fnImgOut,recId);
+        ptrMdOut.setValue(MDL_ENABLED,     1,recId);
+        ptrMdOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop2[ Idx2[i] ]),recId);
+        ptrMdOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff2[Idx2[i]],recId);
+        ptrMdOut.setValue(MDL_WEIGHT,      1.,recId);
+        ptrMdOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.,recId);
+        ptrMdOut.setValue(MDL_ANGLE_ROT,   rotRef,recId);
+        ptrMdOut.setValue(MDL_ANGLE_TILT,  tiltRef,recId);
+        ptrMdOut.setValue(MDL_ANGLE_PSI,   bestRot2[Idx2[i]],recId);
+        ptrMdOut.setValue(MDL_SHIFT_X,     -1. * bestTx2[Idx2[i]],recId);
+        ptrMdOut.setValue(MDL_SHIFT_Y,     -1. * bestTy2[Idx2[i]],recId);
+    }
 
-    rowOut.setValue(MDL_ANGLE_PSI,   anglePsi); // anglePsi  bestRot2[Idx2[0]]
-    rowOut.setValue(MDL_SHIFT_X,     shiftX); // shiftX  , -1.*shiftX  -1. * bestTx2[Idx2[0]]
-    rowOut.setValue(MDL_SHIFT_Y,     shiftY); // shiftY  , -1.*shiftY  -1. * bestTy2[Idx2[0]]
+    //    // affine transform matrix of best parameters alignment from reference to experimental
+    //    Matrix2D<double> A(3,3);
+    //    A.initIdentity();
+    //    double ang, cosine, sine;
+    //    ang = DEG2RAD(bestRot2[Idx2[0]]);
+    //    cosine = cos(ang);
+    //    sine = sin(ang);
+    //    // rotation
+    //    MAT_ELEM(A,0, 0) = cosine;
+    //    MAT_ELEM(A,0, 1) = sine;
+    //    MAT_ELEM(A,1, 0) = -sine;
+    //    MAT_ELEM(A,1, 1) = cosine;
+    //    // Shift
+    //    MAT_ELEM(A,0, 2) = bestTx2[Idx2[0]];
+    //    MAT_ELEM(A,1, 2) = bestTy2[Idx2[0]];
+
+    //    // apply inverse
+    //    A=A.inv();
+
+    //    double scale, shiftX, shiftY, anglePsi;
+    //    bool flip;
+    //    transformationMatrix2Parameters2D(A,flip,scale,shiftX,shiftY,anglePsi);
+
+    //    //real shifts for experimental keeping in mind that experimetal images, later are first shifted and then rotated
+    //    double tx, ty;
+    //    //tx=cosine*shiftX-sine*shiftY; // este funcionó en inter.cpp
+    //    //ty=sine*shiftX+cosine*shiftY;
+    //    tx=cosine*shiftX+sine*shiftY;   // este parece funcionar
+    //    ty=-sine*shiftX+cosine*shiftY;
+
+    //    printf("\nparametros alinean ref con exp \n"
+    //           "bestRot: %.2f \t bestTx: %.2f \t bestTy: %.2f \n ",bestRot2[Idx2[0]],bestTx2[Idx2[0]],bestTy2[Idx2[0]]);
+    //    printf("\nparametros de la inversa de la transf. anterior \n "
+    //           "anglePsi: %.2f \t shiftX: %.2f \t shiftY: %.2f \n ",anglePsi,shiftX,shiftY);
+    //    printf("\nlo que paso al metadata: \n "
+    //           "bestRot: %.2f \t tx: %.2f \t ty: %.2f \n ",bestRot2[Idx2[0]],tx,ty);
+
+    //    double rotRef, tiltRef;
+    //    // reading info of reference image candidate
+    //    mdRef.getRow(rowRef, size_t( candidatesFirstLoop2[ Idx2[0] ] ) );
+    //    rowRef.getValue(MDL_ANGLE_ROT, rotRef);
+    //    rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
+    //    //save metadata of images with angles
+    //    rowOut.setValue(MDL_IMAGE,       fnImgOut);
+    //    rowOut.setValue(MDL_ENABLED,     1);
+    //    rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop2[ Idx2[0] ]));
+    //    rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff2[Idx2[0]]);
+    //    rowOut.setValue(MDL_WEIGHT,      1.);
+    //    rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
+    //    rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
+    //    rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+
+    //    rowOut.setValue(MDL_ANGLE_PSI,   bestRot2[Idx2[0]]); // anglePsi  bestRot2[Idx2[0]]
+    //    rowOut.setValue(MDL_SHIFT_X,     tx); // shiftX  , -1.*shiftX  -1. * bestTx2[Idx2[0]]
+    //    rowOut.setValue(MDL_SHIFT_Y,     ty); // shiftY  , -1.*shiftY  -1. * bestTy2[Idx2[0]]
 
     // */
     //    duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
@@ -434,6 +434,8 @@ void ProgAngularAssignmentMag::postProcess(){
         ptrMdOut.getValue(MDL_MAXCC,thisMaxCC,__iter.objId);
         if (thisMaxCC>maxCC)
             maxCC=thisMaxCC;
+        if (thisMaxCC==0)
+            ptrMdOut.removeObject(__iter.objId);
     }
     FOR_ALL_OBJECTS_IN_METADATA(ptrMdOut)
     {
@@ -457,6 +459,28 @@ void ProgAngularAssignmentMag::pearsonCorr(const MultidimArray<double> &X, Multi
     arithmetic_mean_and_stddev(Y, Y_m, Y_std);
 
     double mean_prod = mean_of_products(X, Y);
+    double covariace = mean_prod - (X_m * Y_m);
+
+    coeff = covariace / (X_std * Y_std);
+}
+
+/* for normalized cross-correlation*/
+void ProgAngularAssignmentMag::zncc_coeff(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff){
+
+    MultidimArray<double> X2,Y2;
+    X2=X;
+    Y2=Y;
+
+    // covariance
+    double X_m, Y_m, X_std, Y_std;
+    arithmetic_mean_and_stddev(X2, X_m, X_std);
+    arithmetic_mean_and_stddev(Y2, Y_m, Y_std);
+
+    // for normalized CC
+    X2 -= X_m;
+    Y2 -= Y_m;
+
+    double mean_prod = mean_of_products(X2, Y2);
     double covariace = mean_prod - (X_m * Y_m);
 
     coeff = covariace / (X_std * Y_std);
@@ -1219,8 +1243,7 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
         _applyRotationAndShift(MDaRef,rotVar,tx,ty,MDaRefShiftRot);
         circularWindow(MDaRefShiftRot); //circular masked MDaRefShiftRot
         pearsonCorr(MDaIn, MDaRefShiftRot, tempCoeff);  // pearson
-        //        double sigma=0.01;
-        //        tempCoeff=correntropy(MDaIn, MDaRefShiftRot,sigma); //correntropy
+        //        zncc_coeff(MDaIn, MDaRefShiftRot, tempCoeff); // zero mean normalized cross-corr, probably more robust
         if ( tempCoeff > *(bestCoeff) ){
             *(bestCoeff) = tempCoeff;
             *(shift_x) = tx;
