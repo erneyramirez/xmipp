@@ -96,6 +96,12 @@ public: // Internal members
     int                                     peaksFound = 0; // peaksFound in ccVectorRot
     double                                  tempCoeff;
 
+    // matrix for neighbors and angular distance
+    std::vector< std::vector<int> > neighboursMatrix; // this should be global
+    std::vector< std::vector<double> > neighboursDistance; // not sure if necessary this global
+    std::vector< std::vector<double> > neighboursWeights; // this variable should be global
+    int N_neighbours;
+
     size_t idxOut; // index for metadata output file
 
     int testCounter = 0;
@@ -107,6 +113,10 @@ public: // Internal members
     std::vector<double>                     bestTx;
     std::vector<double>                     bestTy;
     std::vector<double>                     bestRot;
+
+    //reference values
+    std::vector<double>               referenceRot;
+    std::vector<double>               referenceTilt;
 
     // some constants
     int sizeMdRef;
@@ -183,7 +193,9 @@ public:
     void maxByRow(MultidimArray<double> &in, MultidimArray<double> &out);
     void getShift(MultidimArray<double> &ccVector, double &shift, const size_t &size);
     void _applyShift(MultidimArray<double> &MDaRef, double &tx, double &ty, MultidimArray<double> &MDaRefShift);
+    void _applyShift(const MultidimArray<double> &MDaRef, double &tx, double &ty, MultidimArray<double> &MDaRefShift);
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void ssimIndex(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void bestCand2(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
     void _applyRotationAndShift(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
     void rotCandidates2(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
