@@ -683,7 +683,7 @@ def configJava(configDict):
         configDict["JNI_CPPPATH"]="%(JAVA_HOME)s/include:%(JAVA_HOME)s/include/linux"
 
 def checkJava(configDict):
-    if not checkProgram("javac"):
+    if not checkProgram("javac") or configDict["JAVAC"]=="":
         return False
 
     javaProg="""
