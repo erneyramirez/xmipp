@@ -98,8 +98,42 @@ void ProgAngularAssignmentMag::printSomeValues(MultidimArray<double> &MDa){
 			std::cout << "val: " << DIRECT_A2D_ELEM(MDa,i,j) << std::endl;
 }
 
+// compute variance respect to principal candidate
+void neighVariance(Matrix1D<double> &neigh, double &retVal){
+
+	// check if could be some simmilar in my case, it seems faster
+	//	mean=stddev=0;
+	//    if (vdim == 0)
+	//        return;
+	//
+	//    double sum = 0, sum2 = 0;
+	//    for (size_t j = 0; j < vdim; ++j)
+	//    {
+	//    	double val=VEC_ELEM(*this,j);
+	//        sum+=val;
+	//        sum2+=val*val;
+	//    }
+	//    mean=sum/vdim;
+	//    stddev=sum2/vdim-mean*mean;
+
+	double val;
+	double sum=0.;
+	double candVal=VEC_ELEM(neigh,0); // value of candidate
+	double diff=0.; // difference between j and jp neighbors
+	double N=neigh.vdim;
+	for(int j=0; j<N; ++j){
+		val=VEC_ELEM(neigh,j);
+		diff=val-candVal;
+		sum+=diff*diff;
+	}
+	retVal=sum/N;
+}
+
 void ProgAngularAssignmentMag::preProcess()
 {
+	// I want this method to run using several processors
+	// it looks like runs sequentially N times when mpirun -np N is launched
+	// todo check in mpi program
 	mdIn.read(fnIn);
 	mdRef.read(fnRef);
 
@@ -108,15 +142,16 @@ void ProgAngularAssignmentMag::preProcess()
 	getImageSize(mdIn,Xdim,Ydim,Zdim,Ndim);
 
 	// some constants
-	n_rad = size_t(Xdim/2 + 0.5);
+	n_rad = size_t(Xdim/2. + 0.5);
 
 	startBand=size_t((sampling*Xdim)/100.);
 	startBand=(startBand >= n_rad) ? n_rad-16 : startBand;
 	finalBand=size_t((sampling*Xdim)/(sampling*3));  // den MaxTargetResolution related e.g.  (sampling*3+1) or 11.
 	finalBand=(finalBand >= n_rad) ? n_rad-1 : finalBand;
 
-	//    startBand = 0;
-	//    finalBand = n_rad-1;
+	//	// redefining bands
+	//	startBand=size_t(0);
+	//	finalBand=size_t(Xdim/3.); // equivalent //	finalBand=size_t((sampling*Xdim)/(sampling*3)); // sampling*3 is related to maxTargetResolution
 
 	n_bands = finalBand - startBand;
 
@@ -142,21 +177,44 @@ void ProgAngularAssignmentMag::preProcess()
 	MultidimArray<double>                   MDaRefFMs_polarPart(n_bands, n_ang2);
 	MultidimArray< std::complex<double> >   MDaRefFMs_polarF;
 
+
+	size_t first=0;
+	MultidimArray<double> refPolar(n_rad, n_ang2);
+	MultidimArray< std::complex<double> > MDaRefAuxF;
+
 	computeHann();// precompute Hann window
 	computeCircular();//precompute circular mask
 
+	// for storage of rot and tilt of reference images
+	referenceRot.resize(sizeMdRef);
+	referenceTilt.resize(sizeMdRef);
+
 	// try to storage all data related to reference images in memory
 	printf("processing reference library...\n");
+	int j=-1;
 	FOR_ALL_OBJECTS_IN_METADATA(mdRef)
 	{
+		j+=1;
 		// reading image
 		mdRef.getValue(MDL_IMAGE, fnImgRef, __iter.objId);
 		ImgRef.read(fnImgRef);
 		MDaRef = ImgRef();
+		// store to call in processImage method
+		double rot, tilt, psi;
+		mdRef.getValue(MDL_ANGLE_ROT,rot,__iter.objId);
+		mdRef.getValue(MDL_ANGLE_TILT,tilt,__iter.objId);
+		mdRef.getValue(MDL_ANGLE_PSI,psi,__iter.objId);
+		referenceRot.at(j)=rot;
+		referenceTilt.at(j)=tilt;
 		// processing reference image
 		vecMDaRef.push_back(MDaRef);
 		_applyFourierImage2(MDaRef, MDaRefF);
 		vecMDaRefF.push_back(MDaRefF);
+		//fourier of polar image in real space // tengo que mirar si es mejor acá o en el process image porque creo que estoy haciendo calculos que no voy a utilizar, ya que esto solo se usa con un porcentaje de los candidatos definido por la variable local nCand
+		refPolar=imToPolar(MDaRef,first,n_rad);
+		_applyFourierImage2(refPolar,MDaRefAuxF,n_ang); // todo add another transformer for this image size because become slower when polar images have different sizes
+		vecMDaRef_polarF.push_back(MDaRefAuxF);
+		// fourier of polar magnitude spectra
 		transformerImage.getCompleteFourier(MDaRefF2);
 		_getComplexMagnitude(MDaRefF2, MDaRefFM);
 		completeFourierShift(MDaRefFM, MDaRefFMs);
@@ -171,118 +229,87 @@ void ProgAngularAssignmentMag::preProcess()
 	bestTy.resize(sizeMdRef);
 	bestRot.resize(sizeMdRef);
 
-	// related to rot and tilt of reference
-	referenceRot.resize(sizeMdRef);
-	referenceTilt.resize(sizeMdRef);
-
 	mdOut.setComment("experiment for metadata output containing data for reconstruction");
 
-	std::ofstream outfile("/home/jeison/Escritorio/testNeighbours.txt");
-	outfile<< "Idx" << "\t" << "distance" <<"    \t    \n\n";
+	// Define the neighborhood graph
+	//	computingNeighborGraph();
 
-	// Define the neighbourhood graph
+}
 
-	N_neighbours=4; // including same cand
-	std::vector<int> allNeighboursjp(sizeMdRef); // for ordering
-	std::vector<int> nearNeighbours(N_neighbours);
-	std::vector<double> vecNearNeighboursWeights(N_neighbours);
-	Matrix1D<double> distanceToj, dirj, dirjp, nearNeighboursDist;
+void ProgAngularAssignmentMag::computingNeighborGraph(){
+
+	//	std::ofstream outfile("/home/jeison/Escritorio/testNeighbours.txt");
+	//	outfile<< "Idx" << "\t" << "distance" <<"    \t    \n\n";
+
+	double factor=180./3.141592653;
+	N_neighbors=3; // including candidate itself
+	std::vector<int> allNeighborsjp(sizeMdRef); // for ordering
+	std::vector<int> nearNeighbors(N_neighbors);
+	std::vector<double> vecNearNeighborsWeights(N_neighbors);
+	Matrix1D<double> distanceToj, dirj, dirjp, nearNeighborsDist;
 	printf("processing neighbors graph...\n");
-	int j=-1;
-	FOR_ALL_OBJECTS_IN_METADATA(mdRef)//neighbours for each object in mdRef
-	{
-		j+=1;
+	FOR_ALL_OBJECTS_IN_METADATA(mdRef){
+		// in case this methods works fine
+		// this first lines are the same in preProcess when processing reference images
 		double rotj, tiltj, psij;
 		mdRef.getValue(MDL_ANGLE_ROT,rotj,__iter.objId);
 		mdRef.getValue(MDL_ANGLE_TILT,tiltj,__iter.objId);
 		mdRef.getValue(MDL_ANGLE_PSI,psij,__iter.objId);
-		// store to call in processImage method
-		referenceRot.at(j)=rotj;
-		referenceTilt.at(j)=tiltj;
 		distanceToj.initZeros(sizeMdRef);
-		nearNeighboursDist.initZeros(N_neighbours);
+		nearNeighborsDist.initZeros(N_neighbors);
 		Euler_direction(rotj,tiltj,psij,dirj);
 		int jp=-1;
-		for (MDIterator __iter2(mdRef); __iter2.hasNext(); __iter2.moveNext())
-		{
+		for (MDIterator __iter2(mdRef); __iter2.hasNext(); __iter2.moveNext()){
 			jp+=1;
 			double rotjp, tiltjp, psijp;
 			mdRef.getValue(MDL_ANGLE_ROT,rotjp,__iter2.objId);
 			mdRef.getValue(MDL_ANGLE_TILT,tiltjp,__iter2.objId);
 			mdRef.getValue(MDL_ANGLE_PSI,psijp,__iter2.objId);
+
+			// todo check tilt value and if it is outside some range far from tiltj
+			//then dont make distance computation and put a big value, i.e. "possibly not neighbor"
 			Euler_direction(rotjp,tiltjp,psijp,dirjp);
 			VEC_ELEM(distanceToj,jp)=spherical_distance(dirj,dirjp);
-			allNeighboursjp.at(jp)=jp;
+			allNeighborsjp.at(jp)=jp;
 
 
 			// FALTA PONER SIMETRIA
 		}
 
 		//partial sort
-		std::partial_sort(allNeighboursjp.begin(), allNeighboursjp.begin()+N_neighbours, allNeighboursjp.end(),
+		// todo check all this lambda functions definition, SonarCloud gave me some hints
+		std::partial_sort(allNeighborsjp.begin(), allNeighborsjp.begin()+N_neighbors, allNeighborsjp.end(),
 				[&](int i, int j){return VEC_ELEM(distanceToj,i) < VEC_ELEM(distanceToj,j); });
-
 		//        // full sort
 		//        std::sort(allNeighboursjp.begin(), allNeighboursjp.end(),
 		//                  [&](int i, int j){return VEC_ELEM(distanceToj,i) < VEC_ELEM(distanceToj,j); });
 
-		double factor=180./3.141592653;
-		for(int i=0;i<N_neighbours;i++){
-			nearNeighbours.at(i)=allNeighboursjp.at(i); //
-			VEC_ELEM(nearNeighboursDist,i)=distanceToj[nearNeighbours[i]]*factor; // for compute mean and std;
-			outfile<< nearNeighbours[i] << " \t  " << VEC_ELEM(nearNeighboursDist,i) <<"  \t  ";
-		}
-		outfile<<"\n";
 
-		double meanAngDist=0.;
+		for(int i=0;i<N_neighbors;i++){
+			nearNeighbors.at(i)=allNeighborsjp.at(i); //
+			VEC_ELEM(nearNeighborsDist,i)=distanceToj[nearNeighbors[i]]*factor; // for compute mean and std;
+			//			outfile<< nearNeighbors[i] << " \t  " << VEC_ELEM(nearNeighborsDist,i) <<"  \t  ";
+		}
+		//		outfile<<"\n";
+
+		//		double meanAngDist=0.;
 		double varAngDist=0.;
-		nearNeighboursDist.computeMeanAndStddev(meanAngDist,varAngDist);
-		varAngDist*=varAngDist;
+		//		nearNeighborsDist.computeMeanAndStddev(meanAngDist,varAngDist); //todo compute variance as in processImage using neighVariance method
+		//		varAngDist*=varAngDist;
+		neighVariance(nearNeighborsDist,varAngDist);
 
-		for(int i=0;i<N_neighbours;i++){
-			vecNearNeighboursWeights.at(i) = exp(-0.5*VEC_ELEM(nearNeighboursDist,i)/varAngDist);
-			outfile<< nearNeighbours[i] << " \t  " << vecNearNeighboursWeights[i] <<"  \t  ";
+		for(int i=0;i<N_neighbors;i++){
+			vecNearNeighborsWeights.at(i) = exp(-0.5*VEC_ELEM(nearNeighborsDist,i)/varAngDist);
+			//			outfile<< nearNeighbors[i] << " \t  " << vecNearNeighborsWeights[i] <<"  \t  ";
 		}
-		outfile<<"\n";
+		//		outfile<<"\n";
 
-		//        vecNearNeighboursWeights.at(i)=VEC_ELEM(nearNeighboursDist,i);
 
 		// for this __iter.objId reference image
-		neighboursMatrix.push_back(nearNeighbours);
-		neighboursWeights.push_back(vecNearNeighboursWeights);
+		neighboursMatrix.push_back(nearNeighbors);
+		neighboursWeights.push_back(vecNearNeighborsWeights);
 	}
-	outfile.close();
-}
-
-// compute variance respect to principal candidate
-void varVariance(Matrix1D<double> &neigh, double &retVal){
-
-	// check if could be some simmilar in my case, it seems faster
-	//	mean=stddev=0;
-	//    if (vdim == 0)
-	//        return;
-	//
-	//    double sum = 0, sum2 = 0;
-	//    for (size_t j = 0; j < vdim; ++j)
-	//    {
-	//    	double val=VEC_ELEM(*this,j);
-	//        sum+=val;
-	//        sum2+=val*val;
-	//    }
-	//    mean=sum/vdim;
-	//    stddev=sum2/vdim-mean*mean;
-
-	double val;
-	double sum=0.;
-	double candVal=VEC_ELEM(neigh,0); // value of candidate
-	double diff=0.; // diference between j and jp neighbors
-	double N=neigh.vdim;
-	for(int j=0; j<N; ++j){
-		val=VEC_ELEM(neigh,j);
-		diff=val-candVal;
-		sum+=diff*diff;
-	}
-	retVal=sum/N;
+	//	outfile.close();
 }
 
 void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileName &fnImgOut, const MDRow &rowIn, MDRow &rowOut){
@@ -314,7 +341,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
 
 	tempCoeff = 0.0;
 	int k = 0;
-	double bestCandVar, bestCoeff, Tx, Ty;
+	double psi, cc_coeff, Tx, Ty;
 	// loop over reference stack
 	for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
 		// computing relative rotation and traslation
@@ -323,59 +350,63 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
 		peaksFound = 0;
 		std::vector<double>().swap(cand);
 		rotCandidates(ccVectorRot, cand, XSIZE(ccMatrixRot), &peaksFound);
-		bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &bestCandVar, &Tx, &Ty, &bestCoeff);
+		bestCand(MDaIn, MDaInF, vecMDaRef[countRefImg], cand, peaksFound, &psi, &Tx, &Ty, &cc_coeff);
 		// all the results are storaged for posterior partial_sort
 		Idx[countRefImg] = k;
 		k+=1;
-		candidatesFirstLoop[countRefImg] = countRefImg+1;
-		candidatesFirstLoopCoeff[countRefImg] = bestCoeff;
+		candidatesFirstLoop[countRefImg] = countRefImg;
+		candidatesFirstLoopCoeff[countRefImg] = cc_coeff;
 		bestTx[countRefImg] = Tx;
 		bestTy[countRefImg] = Ty;
-		bestRot[countRefImg] = bestCandVar;
+		bestRot[countRefImg] = psi;
 	}
 
+	/*  // skip second loop, and sort to get better candidates
+	// choose nCand of the candidates with best corrCoeff
+	int nCand = 1; // 1  3
+	std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
+			[&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
+
+	// reading info of reference image candidate
+	double rotRef, tiltRef;
+	// reading info of reference image candidate
+	rotRef=referenceRot.at(Idx[0]);
+	tiltRef=referenceTilt.at(Idx[0]);
+	//save metadata of images with angles
+	rowOut.setValue(MDL_IMAGE,       fnImgOut);
+	rowOut.setValue(MDL_ENABLED,     1);
+	rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop[ Idx[0] ]));
+	rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff[Idx[0]]);
+	rowOut.setValue(MDL_WEIGHT,      1.);
+	rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
+	rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
+	rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+	rowOut.setValue(MDL_ANGLE_PSI,   bestRot[Idx[0]]);
+	rowOut.setValue(MDL_SHIFT_X,     -bestTx[Idx[0]]);
+	rowOut.setValue(MDL_SHIFT_Y,     -bestTy[Idx[0]]);
+	// */
+
 	// at this point all correlations are computed
-	// now I need to check neighbors, trying to select the most probable candidate
-
-
-	//    // nueva idea de carlos
-	//    std::vector<double> allVarTx;
-	//    for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
-	//    	allVarTx.push_back(varTx);
-	//      // calculo la varianza de los vecinos de countRefImg
-	//    }
-	//
-	//    indexSort(allVarTx); // organizo algun vector IdxTx, según las varianzas, y el peso para ese candidato será el percentil 1-idx/N_candidates
-	//
-	//    std::vector<double> allVarTy;
-	//    for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
-	//    	allVarTy.push_back(varTy);
-	//    }
-	//
-	//    indexSort(allVarTy);
-	//
-	//    for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){ //
-	//    	miWeightedCC[countRefImg]= miCC*weight(miVarTx Idx[])*weight(miVarPsi)
-	//    }
-
-	// ejecución de esa idea
+	// now I need to check neighbors, trying to select the most probable candidate using neighbors information
+	/*  // PERCENTILES
 	std::vector<double> percentVect(sizeMdRef);
 
 	std::vector<double> allVarTx(sizeMdRef);
 	std::vector<int>    IdxVarTx(sizeMdRef);
 	std::vector<double> allVarTy(sizeMdRef);
 	std::vector<int>    IdxVarTy(sizeMdRef);
-	std::vector<double> allVarPsi(sizeMdRef); // no estoy seguro que sea bueno poner estas últimas dos variables
+	std::vector<double> allVarPsi(sizeMdRef); // not sure if is good to check this two last variances
 	std::vector<double> allVarCC(sizeMdRef);
 	Matrix1D<double> neighTx, neighTy, neighPsi, neighCC;
 	double varTx, varTy, varPsi, varCC;
-	k=0;
+	k=-1;
 	double dk;
 	for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
-		neighTx.initZeros(N_neighbours);
-		neighTy.initZeros(N_neighbours);
-		neighPsi.initZeros(N_neighbours);
-		neighCC.initZeros(N_neighbours);
+		k+=1;
+		neighTx.initZeros(N_neighbors);
+		neighTy.initZeros(N_neighbors);
+		neighPsi.initZeros(N_neighbors);
+		neighCC.initZeros(N_neighbors);
 		varTx=0.;
 		varTy=0.;
 		varPsi=0.;
@@ -383,7 +414,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
 		double norm=0.;
 		double weight=0.;
 		int neighborIdx;
-		for(int jj=0;jj<N_neighbours;++jj){
+		for(int jj=0;jj<N_neighbors;++jj){
 			neighborIdx=neighboursMatrix.at(countRefImg).at(jj);
 			weight=neighboursWeights.at(countRefImg).at(jj);
 			norm+=weight; //unused now
@@ -393,16 +424,11 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
 			VEC_ELEM(neighPsi,jj)=bestRot[neighborIdx]; // if want to compute variance I have to put in correct range, i.e -90 == 270
 			VEC_ELEM(neighCC,jj)=candidatesFirstLoopCoeff[neighborIdx];
 
-			//    		//            // i think they should go weighted because if they are no so close each other, then they should not have so similar values
-			//    		VEC_ELEM(neighTx,jj)*=weight;
-			//    		VEC_ELEM(neighTy,jj)*=weight;
-			//    		VEC_ELEM(neighPsi,jj)*=weight;
-			//    		VEC_ELEM(neighCC,jj)*=weight;
 		}
 
-		varVariance(neighTx,varTx); // todo change name to neighVariance
-		varVariance(neighTy,varTy);
-		varVariance(neighCC,varCC);
+		neighVariance(neighTx,varTx);
+		neighVariance(neighTy,varTy);
+		neighVariance(neighCC,varCC);
 
 		dk=k;
 		percentVect[k]=1.-dk/sizeMdRef;
@@ -410,14 +436,6 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
 		IdxVarTy[k]=k;
 		allVarTx[k]=varTx;
 		allVarTy[k]=varTy;
-
-		printf("percent: %.4f \t varTx: %.4f \t varTy: %.4f \n",
-				percentVect[k], allVarTx[k], allVarTy[k]);
-		std::cin.ignore();
-
-		k+=1;
-
-
 	}
 
 	// sort
@@ -429,44 +447,61 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
 	// changing correlations
 	std::vector<double> weightedCC(sizeMdRef);
 	std::vector<int>    IdxWeightedCC(sizeMdRef);
-	k=0;
+	k=-1;
 	for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){
+		k+=1;
 		double currentCC = candidatesFirstLoopCoeff[countRefImg];
 		double newCC=currentCC*percentVect[IdxVarTx[countRefImg]]*percentVect[IdxVarTy[countRefImg]];
 		IdxWeightedCC[k]=k;
 		weightedCC[k]=newCC;
-		k+=1;
 	}
 
 	std::sort(IdxWeightedCC.begin(), IdxWeightedCC.end(),
 			[&](int i, int j){ return weightedCC[i] > weightedCC[j]; });
 
-	for(int j=0;j<5;++j){
-		printf("corrBefore: %.4f \t corrAfter: %.4f \t candidate: %d ",
-				candidatesFirstLoopCoeff[j], weightedCC[IdxWeightedCC[j]], IdxWeightedCC[j]+1);
-	}
-	printf("\n");
+	//	for(int j=0;j<5;++j){
+	//		printf("corrBefore: %.4f \t corrAfter: %.4f \t candidate: %d \n",
+	//				candidatesFirstLoopCoeff[IdxWeightedCC[j]], weightedCC[IdxWeightedCC[j]], IdxWeightedCC[j]+1);
+	//	}
+	//	printf("\n");
+	//	std::cin.ignore();
 
-	/*// IDEA DE LOS SCORES
+	double rotRef, tiltRef;
+	// reading info of reference image candidate
+	rotRef=referenceRot.at(IdxWeightedCC[0]);
+	tiltRef=referenceTilt.at(IdxWeightedCC[0]);
+	//save metadata of images with angles
+	rowOut.setValue(MDL_IMAGE,       fnImgOut);
+	rowOut.setValue(MDL_ENABLED,     1);
+	rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop[ IdxWeightedCC[0] ]));
+	rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff[IdxWeightedCC[0]]); // o weightedCC[IdxWeightedCC[0]]  candidatesFirstLoopCoeff[IdxWeightedCC[0]]
+	rowOut.setValue(MDL_WEIGHT,      1.);
+	rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
+	rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
+	rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+	rowOut.setValue(MDL_ANGLE_PSI,   bestRot[IdxWeightedCC[0]]);
+	rowOut.setValue(MDL_SHIFT_X,     -bestTx[IdxWeightedCC[0]]);
+	rowOut.setValue(MDL_SHIFT_Y,     -bestTy[IdxWeightedCC[0]]);
+
+	// */
+
+	/* // SCORES
         double fTx, fTy, fPsi, fCC, norm, weight;
-
         Matrix1D<double> neighTx, neighTy, neighPsi, neighCC;
         double varTx, varTy, varPsi, varCC, sumOfVariances;
-
-
         k=0;
-        std::vector<unsigned int>               candidatesFirstLoop2(sizeMdRef);
+        std::vector<unsigned int>               candidatesSecondLoop(sizeMdRef);
         std::vector<unsigned int>               Idx2(sizeMdRef);
-        std::vector<double>                     candidatesFirstLoopCoeff2(sizeMdRef);
+        std::vector<double>                     candidatesSecondLoopScore(sizeMdRef);
 
-        double testSumOfVariances=1000.; // todo borrar o usar diferente
-        double testCC=0.;
-        int finalCandidate=0;
+        double minSumOfVariances=1000.;
+        double newMaxCC=0.;
+        double maxScore=0.;
         for(int countRefImg = 0; countRefImg < sizeMdRef; countRefImg++){ //
-            neighTx.initZeros(N_neighbours);
-            neighTy.initZeros(N_neighbours);
-            neighPsi.initZeros(N_neighbours);
-            neighCC.initZeros(N_neighbours);
+            neighTx.initZeros(N_neighbors);
+            neighTy.initZeros(N_neighbors);
+            neighPsi.initZeros(N_neighbors);
+            neighCC.initZeros(N_neighbors);
             varTx=0.;
             varTy=0.;
             varPsi=0.;
@@ -477,22 +512,18 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
             double fCC=0.;
             int neighborIdx;
 
-            for(int jj=0;jj<N_neighbours;++jj){
+            for(int jj=0;jj<N_neighbors;++jj){
             	neighborIdx=neighboursMatrix.at(countRefImg).at(jj);
             	weight=neighboursWeights.at(countRefImg).at(jj);
             	norm+=weight;
             	fCC+=candidatesFirstLoopCoeff[neighborIdx]*weight;
+            	// todo mirar si vale la pena definir así o solo usar candidatesFirstLoopCoeff[countRefImg]
+            	// todo o mirar la posibilidad de que mi vecino correle mejor porque puede que haya obtenido mejores parámetros de alineamiento y me deba quedar con esos
                 // variables values of neighbors
                 VEC_ELEM(neighTx,jj)=bestTx[neighborIdx];
                 VEC_ELEM(neighTy,jj)=bestTy[neighborIdx];
                 VEC_ELEM(neighPsi,jj)=bestRot[neighborIdx]; // if want to compute variance I have to put in correct range, i.e -90 == 270
                 VEC_ELEM(neighCC,jj)=candidatesFirstLoopCoeff[neighborIdx];
-
-                //            // i think they should go weighted because if they are no so close each other, then they should not have so similar values
-                VEC_ELEM(neighTx,jj)*=weight;
-                VEC_ELEM(neighTy,jj)*=weight;
-                VEC_ELEM(neighPsi,jj)*=weight;
-                VEC_ELEM(neighCC,jj)*=weight;
             }
 
             //score
@@ -500,173 +531,67 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
             double score=fCC;
 
             // i don't want to compute variance respect to the mean value, but respect to the value of countRefImg candidate
-            varVariance(neighTx,varTx); // todo change name to neighVariance
-            varVariance(neighTy,varTy);
-            varVariance(neighCC,varCC);
+            neighVariance(neighTx,varTx);
+            neighVariance(neighTy,varTy);
+            neighVariance(neighCC,varCC);
 
-            // quizá el ordenamiento de los posibles candidatos lo quiera hacer usando una sola variable
-            double weightToCC=1.; // quizá deba darle más peso a esta varianza
-            double weightToShift=1.;   // cambiando estos pesos, hay resultados diferentes será util?
-            sumOfVariances=weightToShift*varTx+weightToShift*varTy;  // creo que en esta parte debo tener también en cuenta la distancia (lo de los pesos)
-            // voy a ordenar para obtener la menor suma de varianzas, pero además que tenga la mayor CC
-            // todo en lugar de almacenar esto y ordenar después, mejor me voy quedando con los datos
-            // del menor score y la correlación alta
+            // looking for low variance neighborhood
+            sumOfVariances=varTx+varTy;
 
-            // all the results are storaged for sort
+            // all the results storage for sort
             Idx2[countRefImg] = k;
             k+=1;
-            candidatesFirstLoop2[countRefImg] = countRefImg+1;
-            candidatesFirstLoopCoeff2[countRefImg] = sumOfVariances;
-
-            // new score+
+            candidatesSecondLoop[countRefImg] = countRefImg+1;
+            // new score
             score/=sumOfVariances;
 
-            if((sumOfVariances<testSumOfVariances) && (fCC>testCC)){
-                // some prints
-                printf("neighbors near %d\n",countRefImg);
-                for(int jj=0;jj<N_neighbours;++jj){
-                	printf("%d\t",neighboursMatrix.at(countRefImg).at(jj));
-                }
-                printf("\n");
+            if((sumOfVariances<minSumOfVariances) && (fCC>newMaxCC) && (score>maxScore)){
+            	candidatesSecondLoopScore[countRefImg] = score;
 
-            	printf("neighbors weights\n");
-            	for(int jj=0;jj<N_neighbours;++jj){
-            		printf("%.2f\t",neighboursWeights.at(countRefImg).at(jj));
-            	}
-            	printf("\n");
+            	//            	printf("candidate: %d \t sOv: %.4f \t sOv_before: %.4f \t CC_now: %.4f \t CC_bef: %.4f \t score: %.4f \t fCC: %.4f\n",
+            	//            			candidatesSecondLoop[countRefImg],
+            	//						sumOfVariances, minSumOfVariances,
+            	//						neighCC[0], newMaxCC,
+            	//						score, fCC);
 
-                double rotRef, tiltRef;
-                printf("rot/tilt of this neighborhood\n");
-                for(int jj=0;jj<N_neighbours;jj++){
-                    // reading info of reference image candidate
-                	rotRef=referenceRot.at(neighboursMatrix.at(countRefImg).at(jj));
-                	tiltRef=referenceTilt.at(neighboursMatrix.at(countRefImg).at(jj));
-                	printf("%.2f/%.2f\t",rotRef, tiltRef);
-
-                	//                // preguntar: how can i do some like
-                	//                mdRef.getValue(MDL_ANGLE_ROT,rotRef,__iter2.objId);
-                	//                mdRef.getValue(MDL_ANGLE_TILT,tiltRef,__iter2.objId);
-                }
-                printf("\n");
-
-                printf("neighbors shiftX\n");
-                for(int jj=0;jj<N_neighbours;++jj){
-                	printf("%.2f,\t",VEC_ELEM(neighTx,jj));
-                }
-                printf("computed variance: %.4f\n",varTx);
-
-                printf("neighbors shiftY\n");
-                for(int jj=0;jj<N_neighbours;++jj){
-                	printf("%.2f,\t",VEC_ELEM(neighTy,jj));
-                }
-                printf("computed variance: %.4f\n",varTy);
-
-                printf("neighbors CC\n");
-                for(int jj=0;jj<N_neighbours;++jj){
-                	printf("%.2f,\t",VEC_ELEM(neighCC,jj));
-                }
-                printf("computed variance: %.4f\n",varCC);
-
-                printf("candidate: %d \t sOv: %.4f \t sOv_before: %.4f \t CC_now: %.4f \t CC_bef: %.4f \t score: %.4f \t fCC: %.4f\n",
-                		candidatesFirstLoop2[countRefImg],
-    					sumOfVariances, testSumOfVariances,
-    					neighCC[0], testCC,
-    					score, fCC);
-
-            	testSumOfVariances=sumOfVariances;
-            	testCC=fCC;
-            	finalCandidate=candidatesFirstLoop2[countRefImg];
-
-            	std::cin.ignore();
+            	minSumOfVariances=sumOfVariances;
+            	newMaxCC=fCC;
+            	maxScore=score;
             }
-
-
-
-
-            // no vamos a calcular el score asi, sino que vamos a ordenar y después el peso que asignamos es 1 - Idx/1000; (el percentil)
-
-            //        // some useful prints
-            //        printf("neighbors near %d\n",countRefImg);
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%d\t",neighboursMatrix.at(countRefImg).at(jj));
-            //        }
-            //        printf("\n");
-            //        printf("neighbors weights\n");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f\t",neighboursWeights.at(countRefImg).at(jj));
-            //        }
-            //        printf("\n");
-            //        printf("neighbors shiftX\nvar([");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f,\t",bestTx[neighboursMatrix.at(countRefImg).at(jj)]);
-            //        }
-            //        printf("]) weighted value: %.2f\n", fTx);
-            //
-            //        printf("neighbors shiftX\nvar([");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f,\t",VEC_ELEM(neighTx,jj));
-            //        }
-            //        printf("\n");
-            //
-            //
-            //        printf("neighbors shiftY\nvar([");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f,\t",bestTy[neighboursMatrix.at(countRefImg).at(jj)]);
-            //        }
-            //        printf("]) weighted value: %.2f\n", fTy);
-            //
-            //        printf("neighbors shiftY\nvar([");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f,\t",VEC_ELEM(neighTy,jj));
-            //        }
-            //        printf("\n");
-            //
-            //        printf("neighbors psi\n");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f\t",bestRot[neighboursMatrix.at(countRefImg).at(jj)]);
-            //        }
-            //        printf("weighted value: %.2f\n", fPsi);
-            //        printf("neighbors CC\n");
-            //        for(int jj=0;jj<N_neighbours;++jj){
-            //        	printf("%.2f\t",candidatesFirstLoopCoeff[neighboursMatrix.at(countRefImg).at(jj)]);
-            //        }
-            //        printf("weighted value: %.2f\n", fCC);
-            //        std::cin.ignore();
-
+            else{
+            	// in this case, the score should contain the CC computed in first loop
+            	candidatesSecondLoopScore[countRefImg] = candidatesFirstLoopCoeff[countRefImg];
+            }
         }
 
-        printf("\n***********candidato final: %d ***************\n", finalCandidate);
+        // sorting based in score
+        // podria ser util definir lo de los percentiles acá también asi como en la idea "new idea"
+        // 		dk=k;
+		//      percentVect[k]=1.-dk/sizeMdRef;
+    	std::sort(Idx2.begin(), Idx2.end(),
+    			[&](int i, int j){ return candidatesSecondLoopScore[i] > candidatesSecondLoopScore[j]; });
+
+    	double rotRef, tiltRef;
+    	// reading info of reference image candidate
+    	rotRef=referenceRot.at(Idx2[0]);
+    	tiltRef=referenceTilt.at(Idx2[0]);
+    	//save metadata of images with angles
+    	rowOut.setValue(MDL_IMAGE,       fnImgOut);
+    	rowOut.setValue(MDL_ENABLED,     1);
+    	rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop[ Idx2[0] ]));
+    	rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff[Idx2[0]]);
+    	rowOut.setValue(MDL_WEIGHT,      1.);
+    	rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
+    	rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
+    	rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+    	rowOut.setValue(MDL_ANGLE_PSI,   bestRot[Idx2[0]]);
+    	rowOut.setValue(MDL_SHIFT_X,     -bestTx[Idx2[0]]);
+    	rowOut.setValue(MDL_SHIFT_Y,     -bestTy[Idx2[0]]);
+
      //*/
 
-
-
-	/*  // skip second loop
-    // choose nCand of the candidates with best corrCoeff
-    int nCand = 1; // 1  3
-    std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
-                      [&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
-
-    double rotRef, tiltRef;
-    // reading info of reference image candidate
-    mdRef.getRow(rowRef, size_t( candidatesFirstLoop[ Idx[0] ] ) );
-    rowRef.getValue(MDL_ANGLE_ROT, rotRef);
-    rowRef.getValue(MDL_ANGLE_TILT, tiltRef);
-
-    //save metadata of images with angles
-    rowOut.setValue(MDL_IMAGE,       fnImgOut);
-    rowOut.setValue(MDL_ENABLED,     1);
-    rowOut.setValue(MDL_IDX,         size_t(candidatesFirstLoop[ Idx[0] ]));
-    rowOut.setValue(MDL_MAXCC,       candidatesFirstLoopCoeff[Idx[0]]);
-    rowOut.setValue(MDL_WEIGHT,      1.);
-    rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
-    rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
-    rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
-    rowOut.setValue(MDL_ANGLE_PSI,   bestRot[Idx[0]]);
-    rowOut.setValue(MDL_SHIFT_X,     -bestTx[Idx[0]]);
-    rowOut.setValue(MDL_SHIFT_Y,     -bestTy[Idx[0]]);
-    // */
-
-	/* SEGUNDO LOOP SOBRE UN PORCENTAJE DE LAS IMAGENES. METODO IGUAL AL LOOP ANTERIOR
+	/* second loop over a percentage of images using loop 1 method
+	// i should check wats wrong with ordering
     // evaluar luego el aporte de este segundo loop, por ejemplo, contando las mejoras en ccCoeff
     // y si estos aumentos valen la pena respecto al tiempo que tarda
     // choose nCand of the candidates with best corrCoeff for second loop candidate search.
@@ -843,6 +768,112 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg, const FileNam
     //    rowOut.setValue(MDL_SHIFT_Y,     ty); // shiftY  , -1.*shiftY  -1. * bestTy2[Idx2[0]]
 
     // */
+
+	//		/* search rotation with polar real image representation
+	int nCand = int(.10*sizeMdRef+1);
+	std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
+			[&](int i, int j){return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j]; });
+
+	std::vector<unsigned int>               candidatesSecondLoop(nCand);
+	std::vector<unsigned int>               Idx2(nCand);
+	std::vector<double>                     candidatesSecondLoopCoeff(nCand);
+	std::vector<double>                     bestTx2(nCand);
+	std::vector<double>                     bestTy2(nCand);
+	std::vector<double>                     bestRot2(nCand);
+
+	// variables new approach
+	size_t first=0;
+	size_t last=n_rad;
+	int thisNbands=last-first;
+	MultidimArray<double> inPolar(thisNbands, n_ang2);
+	MultidimArray<double> refPolar(thisNbands, n_ang2);
+
+	MultidimArray<double> MDaExpShift,MDaExpShiftRot2; // transform experimental
+	MDaExpShiftRot2.setXmippOrigin();
+
+	MultidimArray<double> ccMatrixRot2;
+	MultidimArray<double> ccVectorRot2;
+
+	MultidimArray< std::complex<double> > MDaInAuxF;
+	MultidimArray< std::complex<double> > MDaRefAuxF;
+
+	for(int k = 0; k < nCand; k++){
+		//		k+=1;
+		//apply transform to experimental image
+		double rotVal = -1.*bestRot[Idx[k]]; // -1. because i return parameters for reference image instead of experimental
+		double trasXval = -1.*bestTx[Idx[k]];
+		double trasYval = -1.*bestTy[Idx[k]];
+		_applyShift(MDaIn,trasXval,trasYval,MDaExpShift);//first shift  // TODO define only one transform transformation
+		_applyRotation(MDaExpShift,rotVal,MDaExpShiftRot2); //then rotate
+		//fourier experimental image
+		_applyFourierImage2(MDaExpShiftRot2, MDaInF);//fourier
+		// polar experimental image
+		inPolar=imToPolar(MDaExpShiftRot2,first,last); // this process can be expensive
+		_applyFourierImage2(inPolar,MDaInAuxF,n_ang);
+
+		//		// polar reference image (this should be computed in preprocess() )
+		//		refPolar=imToPolar(vecMDaRef[ Idx[k] ],first,last);
+		//		_applyFourierImage2(refPolar,MDaRefAuxF,n_ang);
+
+		// find rotation and shift
+		//		ccMatrix(MDaInAuxF,MDaRefAuxF,ccMatrixRot2); //
+		ccMatrix(MDaInAuxF,vecMDaRef_polarF[candidatesFirstLoop[Idx[k]]],ccMatrixRot2); // todo check if its correct
+		maxByColumn(ccMatrixRot2, ccVectorRot2);
+		peaksFound = 0;
+		std::vector<double>().swap(cand);
+		rotCandidates(ccVectorRot2, cand, XSIZE(ccMatrixRot2), &peaksFound);
+		// no se si en este caso deba mandar como candidatos theta y theta +/- 180°??
+		bestCand(MDaExpShiftRot2, MDaInF, vecMDaRef[Idx[k]], cand, peaksFound, &psi, &Tx, &Ty, &cc_coeff); //
+
+		// if its better and shifts are within then update
+		double testShiftTx=bestTx[Idx[k]] + Tx;
+		double testShiftTy=bestTy[Idx[k]] + Ty;
+		if( cc_coeff>=candidatesFirstLoopCoeff[Idx[k]] &&
+				std::abs(testShiftTx)<maxShift &&
+				std::abs(testShiftTy)<maxShift &&
+				std::abs(psi)<2.){ //must define which value and why
+			Idx2[k] = k;
+			candidatesSecondLoop[k] = candidatesFirstLoop[ Idx[k]];
+			candidatesSecondLoopCoeff[k] = cc_coeff;
+			bestTx2[k] = testShiftTx;
+			bestTy2[k] = testShiftTy;
+			bestRot2[k] = bestRot[Idx[k]] + psi;
+		}
+		else{
+			Idx2[k] = k;
+			candidatesSecondLoop[k] = candidatesFirstLoop[Idx[k]];
+			candidatesSecondLoopCoeff[k] = candidatesFirstLoopCoeff[Idx[k]];
+			bestTx2[k] = bestTx[Idx[k]];
+			bestTy2[k] = bestTy[Idx[k]];
+			bestRot2[k] = bestRot[Idx[k]];
+		}
+	}
+
+	// choose nCand of the candidates with best corrCoeff
+	//	int nCand = 1; // 1  3
+	std::sort(Idx2.begin(), Idx2.end(),
+			[&](int i, int j){return candidatesSecondLoopCoeff[i] > candidatesSecondLoopCoeff[j]; });
+
+	// reading info of reference image candidate
+	double rotRef, tiltRef;
+	// reading info of reference image candidate
+	rotRef=referenceRot.at(candidatesSecondLoop[Idx2[0]]);
+	tiltRef=referenceTilt.at(candidatesSecondLoop[Idx2[0]]);
+	//save metadata of images with angles
+	rowOut.setValue(MDL_IMAGE,       fnImgOut);
+	rowOut.setValue(MDL_ENABLED,     1);
+	//rowOut.setValue(MDL_IDX,         size_t(candidatesSecondLoop[ Idx2[0] ]));
+	rowOut.setValue(MDL_MAXCC,       candidatesSecondLoopCoeff[Idx2[0]]);
+	rowOut.setValue(MDL_WEIGHT,      1.);
+	rowOut.setValue(MDL_WEIGHT_SIGNIFICANT,   1.);
+	rowOut.setValue(MDL_ANGLE_ROT,   rotRef);
+	rowOut.setValue(MDL_ANGLE_TILT,  tiltRef);
+	rowOut.setValue(MDL_ANGLE_PSI,   bestRot2[Idx2[0]]);
+	rowOut.setValue(MDL_SHIFT_X,     -bestTx2[Idx2[0]]);
+	rowOut.setValue(MDL_SHIFT_Y,     -bestTy2[Idx2[0]]);
+
+	// */
+
 	//    duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
 	//    std::cout << "Operation took "<< duration*1000 << "milliseconds" << std::endl;
 }
@@ -1034,9 +1065,9 @@ void ProgAngularAssignmentMag::_getComplexMagnitude( MultidimArray< std::complex
  *  rad and ang are the number of radius and angular elements*/
 MultidimArray<double> ProgAngularAssignmentMag::imToPolar(MultidimArray<double> &cartIm,
 		size_t &start,
-		size_t &final){
+		size_t &end){
 
-	int thisNbands=final-start;
+	int thisNbands=end-start;
 	MultidimArray<double> polarImg(thisNbands, n_ang2);
 	float pi = 3.141592653;
 	// coordinates of center
@@ -1054,7 +1085,7 @@ MultidimArray<double> ProgAngularAssignmentMag::imToPolar(MultidimArray<double> 
 
 	// loop through rad and ang coordinates
 	double r, t, x_coord, y_coord;
-	for(size_t ri = start; ri < final; ri++){
+	for(size_t ri = start; ri < end; ri++){
 		for(size_t ti = 0; ti < n_ang2; ti++ ){
 			r = ri * delR;
 			t = ti * delT;
@@ -1549,7 +1580,7 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
 		const size_t &size, int *nPeaksFound){
 	const int maxNumPeaks = 30;
 	int maxAccepted = 4;
-	int *peakPos = (int*) calloc(maxNumPeaks,sizeof(int));
+	int *peakPos = (int*) calloc(maxNumPeaks,sizeof(int)); //todo change calloc() and free() for C++ code
 	int cont = 0;
 	*(nPeaksFound) = cont;
 	int i;
@@ -1576,10 +1607,12 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
 		free(peakPos);
 
 		// sorting first in case there are more than maxAccepted peaks
-		//        std::sort(temp.begin(), temp.end(), [&](int i, int j){return dAi(in,i) > dAi(in,j); } );
-		// change for partial sort
-		std::partial_sort(temp.begin(), temp.begin()+maxAccepted, temp.end(),
-				[&](int i, int j){return dAi(in,i) > dAi(in,j); }); // mirar si este aumentó el tiempo de ejecución??
+		std::sort(temp.begin(), temp.end(),
+				[&](int i, int j){return dAi(in,i) > dAi(in,j); } );
+
+		//change for partial sort
+//		std::partial_sort(temp.begin(), temp.begin()+maxAccepted, temp.end(),
+//				[&](int i, int j){return dAi(in,i) > dAi(in,j); }); // mirar si este aumentó el tiempo de ejecución??
 
 		int tam = 2*maxAccepted; //
 		*(nPeaksFound) = tam;
@@ -1687,7 +1720,7 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
 		expPsi=-rotVar;
 		expTx=-tx;
 		expTy=-ty;
-		_applyShift(MDaIn,expTx,expTy,MDaInShift);//first shift
+		_applyShift(MDaIn,expTx,expTy,MDaInShift);//first shift  // todo define only one transform transformation
 		_applyRotation(MDaInShift,expPsi,MDaInShiftRot); //then rotate
 		circularWindow(MDaInShiftRot); //circular masked MDaInRotShift
 		pearsonCorr(MDaRef, MDaInShiftRot, tempCoeff);  // pearson
@@ -1748,40 +1781,40 @@ void ProgAngularAssignmentMag::newApplyGeometry(MultidimArray<double>& __restric
 			y1 = c*double(x) + d*double(y);
 
 			// point 1 (x,y) // 4th
-					p1 = x1 + e1;
-					q1 = y1 + e2;
-					rx = x+Cx;
-					ry = y+Cy;
-					if ( (p1 > lim_x1) && (p1 < lim_x2) && (q1 > lim_y1) && (q1 < lim_y2) ){
-						dAij(out, ry, rx) = interpolate( in, q1, p1);
-					}
+			p1 = x1 + e1;
+			q1 = y1 + e2;
+			rx = x+Cx;
+			ry = y+Cy;
+			if ( (p1 > lim_x1) && (p1 < lim_x2) && (q1 > lim_y1) && (q1 < lim_y2) ){
+				dAij(out, ry, rx) = interpolate( in, q1, p1);
+			}
 
-					// point 2 (-x, -y + Cy) // 3th
-					p2 = -x1 + d1;
-					q2 = -y1 + d2;
-					rx = -x+Cx;
-					ry = -y+2*Cy;
-					if ( (p2 > lim_x1) && (p2 < lim_x2) && (q2 > lim_y1) && (q2 < lim_y2) && (ry < lim_y2) ){
-						dAij(out, ry, rx) = interpolate( in, q2, p2);
-					}
+			// point 2 (-x, -y + Cy) // 3th
+			p2 = -x1 + d1;
+			q2 = -y1 + d2;
+			rx = -x+Cx;
+			ry = -y+2*Cy;
+			if ( (p2 > lim_x1) && (p2 < lim_x2) && (q2 > lim_y1) && (q2 < lim_y2) && (ry < lim_y2) ){
+				dAij(out, ry, rx) = interpolate( in, q2, p2);
+			}
 
-					//point 3 (-x, -y) // 2nd
-							p3 = -x1 + e1;
-							q3 = -y1 + e2;
-							rx = -x+Cx;
-							ry = -y+Cy;
-							if ( (p3 > lim_x1) && (p3 < lim_x2) && (q3 > lim_y1) && (q3 < lim_y2) ){
-								dAij(out, ry, rx) = interpolate( in, q3, p3);
-							}
+			//point 3 (-x, -y) // 2nd
+			p3 = -x1 + e1;
+			q3 = -y1 + e2;
+			rx = -x+Cx;
+			ry = -y+Cy;
+			if ( (p3 > lim_x1) && (p3 < lim_x2) && (q3 > lim_y1) && (q3 < lim_y2) ){
+				dAij(out, ry, rx) = interpolate( in, q3, p3);
+			}
 
-							// point 4 (x, y-Cy) // 1st
-							p4 = x1 + g1;
-							q4 = y1 + g2;
-							rx = x+Cx;
-							ry = y;
-							if ( (p4 > lim_x1) && (p4 < lim_x2) && (q4 > lim_y1) && (q4 < lim_y2) ){
-								dAij(out, ry, rx) = interpolate( in, q4, p4);
-							}
+			// point 4 (x, y-Cy) // 1st
+			p4 = x1 + g1;
+			q4 = y1 + g2;
+			rx = x+Cx;
+			ry = y;
+			if ( (p4 > lim_x1) && (p4 < lim_x2) && (q4 > lim_y1) && (q4 < lim_y2) ){
+				dAij(out, ry, rx) = interpolate( in, q4, p4);
+			}
 		}
 	}
 

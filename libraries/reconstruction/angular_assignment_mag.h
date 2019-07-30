@@ -69,6 +69,9 @@ public: // Internal members
     // vector of Fourier of reference images
     std::vector< MultidimArray< std::complex<double> > > vecMDaRefF;
 
+    // vector of Fourier of polar representation of reference image in real space
+    std::vector< MultidimArray< std::complex<double> > > vecMDaRef_polarF;
+
     // vector of Fourier of polar representation of magnitude spectrum of reference images
     std::vector< MultidimArray< std::complex<double> > > vecMDaRefFMs_polarF;
 
@@ -100,7 +103,7 @@ public: // Internal members
     std::vector< std::vector<int> > neighboursMatrix; // this should be global
     std::vector< std::vector<double> > neighboursDistance; // not sure if necessary this global
     std::vector< std::vector<double> > neighboursWeights; // this variable should be global
-    int N_neighbours;
+    int N_neighbors;
 
     size_t idxOut; // index for metadata output file
 
@@ -217,6 +220,7 @@ public:
     void circularWindow(MultidimArray<double> &in);
     void computeCircular();    
     void zncc_coeff(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
+    void computingNeighborGraph();
 
 private:
 //    void printSomeValues(MultidimArray<double> & MDa);
