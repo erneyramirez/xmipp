@@ -62,12 +62,15 @@ void ProgEliminateLargeEnergy::processImage(const FileName &fnImg, const FileNam
     rowOut = rowIn;
     Image<double> I;
     I.read(fnImg);
-    double stddev=I().computeStddev();
+    double avg, stddev; I().computeAvgStdev(avg, stddev);
     double sigma2=stddev*stddev;
 
     double z=(sigma2/sigma20-1);
-    double zalpha=fabs(icdf_gauss(confidence));
-    if (z>zalpha)
+    double zalphaU=fabs(icdf_gauss(confidence));
+    double zalphaL=-zalphaU;
+    double zavg=stddev>1e-4? std::abs(avg)/stddev:10;
+std::cout  << fnImg  << " "  <<avg << " " << stddev << " " << z << " " << zalphaL << " "  << zalphaU << " " << zavg << std::endl;
+    if (z>zalphaU || z<zalphaL || zavg>9)
         rowOut.setValue(MDL_ENABLED,-1);
     else
         rowOut.setValue(MDL_ENABLED,1);
