@@ -109,6 +109,7 @@ public: // Internal members
     size_t idxOut; // index for metadata output file
 
     int testCounter = 0;
+    int testCounter2=0;
 
     // candidates for each loop
     std::vector<unsigned int>               candidatesFirstLoop;
@@ -116,7 +117,7 @@ public: // Internal members
     std::vector<double>                     candidatesFirstLoopCoeff;
     std::vector<double>                     bestTx;
     std::vector<double>                     bestTy;
-    std::vector<double>                     bestRot;
+    std::vector<double>                     bestPsi;
 
     //reference values
     std::vector<double>               referenceRot;
@@ -178,7 +179,6 @@ public:
     void _applyShiftAndRotation(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
 
     void bestCand(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, /*int &peaksFound,*/ double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
-    void bestCand2(MultidimArray<double> &MDaIn, MultidimArray<std::complex<double> > &MDaInF, MultidimArray<double> &MDaRef, std::vector<double> &cand, int &peaksFound, double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
 
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     void ccMatrix(const MultidimArray<std::complex<double> > &F1, const MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
@@ -200,6 +200,8 @@ public:
     MultidimArray<double> imToPolar2(MultidimArray<double> &cartIm, const size_t &rad, const size_t &ang);
     MultidimArray<double> imToPolar(MultidimArray<double> &cartIm, size_t &start, size_t &final);
     double interpolate(MultidimArray<double> &cartIm, double &x_coord, double &y_coord);
+    void imNormalized_cc(const MultidimArray<double>& I1, const MultidimArray<double>& I2, double &value);
+    void imZNCC(const MultidimArray<double>& I1, const MultidimArray<double>& I2, double &value);
 
     double mean_of_products(const MultidimArray<double> &data1, MultidimArray<double> &data2);
     double mean_of_products(MultidimArray<double> &data1, MultidimArray<double> &data2);
@@ -209,15 +211,15 @@ public:
     void maxByRow(MultidimArray<double> &in, MultidimArray<double> &out);
 
     void newApplyGeometry(MultidimArray<double> &in, MultidimArray<double> &out, const double &a, const double &b, const double &c, const double &d, const double &tx, const double &ty);
+    void normalized_cc(MultidimArray<double> &X, MultidimArray<double> &Y, double &valor);
+    void normalized_cc(const MultidimArray<double> &X, MultidimArray<double> &Y, double &value);
 
     void printSomeValues(MultidimArray<double> & MDa);
     void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
 
-    void rotCandidates2(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
     void rotCandidates3(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size);
     void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size /*,int *nPeaksFound*/);
 
-    void shiftCandidates(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size, int *nPeaksFound);
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void ssimIndex(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void selectBands(MultidimArray<double> &in, MultidimArray<double> &out);
@@ -225,8 +227,6 @@ public:
     void _writeTestFile(const MultidimArray<double> &data, const char* fileName,size_t nFil, size_t nCol);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName);
     void _writeTestFile(MultidimArray<double> &data, const char *fileName, size_t nFil, size_t nCol);
-
-    void zncc_coeff(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
 
 private:
     //    void arithmetic_mean_and_stddev(const MultidimArray<double> &data, double &avg, double &stddev);
