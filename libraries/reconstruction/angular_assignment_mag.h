@@ -179,6 +179,7 @@ public:
     void _applyShiftAndRotation(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
 
     void bestCand(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, /*int &peaksFound,*/ double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
+    void bestCand2(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, /*int &peaksFound,*/ double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
 
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     void ccMatrix(const MultidimArray<std::complex<double> > &F1, const MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
@@ -192,6 +193,7 @@ public:
 
     void _getComplexMagnitude(MultidimArray<std::complex<double> > &FourierData, MultidimArray<double> &FourierMag);
     void getShift(MultidimArray<double> &ccVector, double &shift, const size_t &size);
+    void getShift2(MultidimArray<double> &ccVector, std::vector<double> &cand, const size_t &size);
     void getRot(MultidimArray<double> &ccVector, double &rot, const size_t &size);
 
     void halfFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);

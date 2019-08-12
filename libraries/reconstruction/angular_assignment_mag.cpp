@@ -351,7 +351,8 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		peaksFound = 0;
 		std::vector<double> cand(maxAccepted,0.);
 		rotCandidates3(ccVectorRot, cand, XSIZE(ccMatrixRot));
-		bestCand(MDaIn, MDaInF, vecMDaRef[k], cand, &psi, &Tx, &Ty,&cc_coeff);
+//bestCand(MDaIn, MDaInF, vecMDaRef[k], cand, &psi, &Tx, &Ty,&cc_coeff);
+		bestCand2(MDaIn, MDaInF, vecMDaRef[k], cand, &psi, &Tx, &Ty,&cc_coeff);
 		// all results are storage for posterior partial_sort
 		Idx[k] = k; // for sorting
 		candidatesFirstLoop[k] = k; // for access in second loop
@@ -810,7 +811,8 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		peaksFound = 0;
 		std::vector<double> cand(maxAccepted,0.);
 		rotCandidates3(ccVectorRot2, cand,XSIZE(ccMatrixRot2));
-		bestCand(MDaExpShiftRot2, MDaInF, vecMDaRef[Idx[k]],cand, &psi, &Tx, &Ty, &cc_coeff); //
+//bestCand(MDaExpShiftRot2, MDaInF, vecMDaRef[Idx[k]],cand, &psi, &Tx, &Ty, &cc_coeff); //
+		bestCand2(MDaExpShiftRot2, MDaInF, vecMDaRef[Idx[k]],cand, &psi, &Tx, &Ty, &cc_coeff); //
 
 		// if its better and shifts are within then update
 		double testShiftTx = bestTx[Idx[k]] + Tx;
@@ -828,7 +830,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		} else { //COSS suggests to degrade this candidate (i.e. coeff--> 0), because it doesn't improve
 			Idx2[k] = k;
 			candidatesSecondLoop[k] = candidatesFirstLoop[Idx[k]];
-			candidatesSecondLoopCoeff[k] = candidatesFirstLoopCoeff[Idx[k]]; //candidatesFirstLoopCoeff[Idx[k]];
+			candidatesSecondLoopCoeff[k] = 0.; //candidatesFirstLoopCoeff[Idx[k]];
 			// todo check if works better. It seems that for several images in VIRUS there is no any improvement, i.e. all coeff=0
 			bestTx2[k] = bestTx[Idx[k]];
 			bestTy2[k] = bestTy[Idx[k]];
@@ -838,8 +840,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 
 	// choose nCand of the candidates with best corrCoeff
 	//	int nCand = 1; // 1  3
-	std::sort(Idx2.begin(), Idx2.end(),
-			[&](int i, int j) {return candidatesSecondLoopCoeff[i] > candidatesSecondLoopCoeff[j];});
+	std::sort(Idx2.begin(), Idx2.end(),	[&](int i, int j) {return candidatesSecondLoopCoeff[i] > candidatesSecondLoopCoeff[j];});
 
 	// reading info of reference image candidate
 	double rotRef, tiltRef;
@@ -855,7 +856,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 	rowOut.setValue(MDL_WEIGHT_SIGNIFICANT, 1.);
 	rowOut.setValue(MDL_ANGLE_ROT, rotRef);
 	rowOut.setValue(MDL_ANGLE_TILT, tiltRef);
-	rowOut.setValue(MDL_ANGLE_PSI, bestPsi2[Idx2[0]]);
+	rowOut.setValue(MDL_ANGLE_PSI, realWRAP(bestPsi2[Idx2[0]],-180.,180. ));
 	rowOut.setValue(MDL_SHIFT_X, -bestTx2[Idx2[0]]);
 	rowOut.setValue(MDL_SHIFT_Y, -bestTy2[Idx2[0]]);
 
@@ -1790,8 +1791,7 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
 
 	if (cont) {
 		// sort //todo check if its better to use partial_sort
-		std::sort(peakIdx.begin(), peakIdx.end(),
-				[&](int i, int j) {return dAi(in,i) > dAi(in,j);});
+		std::sort(peakIdx.begin(), peakIdx.end(),[&](int i, int j) {return dAi(in,i) > dAi(in,j);});
 		//change for partial sort
 		//		std::partial_sort(temp.begin(), temp.begin()+maxAccepted, temp.end(),
 		//				[&](int i, int j){return dAi(in,i) > dAi(in,j); }); //
@@ -1865,8 +1865,6 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
 
 	MultidimArray<double> MDaInShift;
 	MultidimArray<double> MDaInShiftRot;
-	//	MDaInShift.resizeNoCopy(MDaIn); // comment because an error when use imedDistance. check if works... it seems to work
-	//	MDaInShiftRot.resizeNoCopy(MDaIn);
 	MDaInShift.setXmippOrigin();
 	MDaInShiftRot.setXmippOrigin();
 
@@ -1881,18 +1879,9 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
 		maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
 		getShift(ccVectorTy, ty, YSIZE(ccMatrixShift));
 		ty = -1. * ty;
+
 		if (std::abs(tx) > maxShift || std::abs(ty) > maxShift)
 			continue;
-		//        // applying rotation -shift to reference
-		//        _applyRotationAndShift(MDaRef,rotVar,tx,ty,MDaRefShiftRot);
-		//        circularWindow(MDaRefShiftRot); //circular masked MDaRefShiftRot
-		//        //        pearsonCorr(MDaIn, MDaRefShiftRot, tempCoeff);  // pearson
-		//        if ( tempCoeff > *(bestCoeff) ){
-		//            *(bestCoeff) = tempCoeff;
-		//            *(shift_x) = tx;
-		//            *(shift_y) = ty;
-		//            *(bestCandRot) = rotVar;
-		//        }
 
 		//apply transformation to experimental image
 		double expTx, expTy, expPsi;
@@ -1905,11 +1894,10 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
 		circularWindow(MDaInShiftRot); //circular masked MDaInRotShift
 		// TODO compute another metric and check agreement between them in order to select better candidates
 		// TODO run projects with this three metrics
-		//		pearsonCorr(MDaRef, MDaInShiftRot, tempCoeff);  // Pearson
+		pearsonCorr(MDaRef, MDaInShiftRot, tempCoeff);  // Pearson
 		//		normalized_cc(MDaRef, MDaInShiftRot, tempCoeff); // NCC
 		//		imNormalized_cc(MDaRef, MDaInShiftRot, tempCoeff); // IMNCC
-		imZNCC(MDaRef, MDaInShiftRot, tempCoeff); // IMZNCC
-
+		//		imZNCC(MDaRef, MDaInShiftRot, tempCoeff); // IMZNCC
 		// TODO COSS suggests use MDaRef as "mask"
 		if (tempCoeff > *(bestCoeff)) {
 			*(bestCoeff) = tempCoeff;
@@ -1917,6 +1905,79 @@ void ProgAngularAssignmentMag::bestCand(/*inputs*/
 			*(shift_y) = -expTy;
 			*(bestPsi) = -expPsi;
 		}
+	}
+}
+
+/* same as bestCand but using 2 candidates for shift instead of 1 only
+ */
+void ProgAngularAssignmentMag::bestCand2(/*inputs*/
+		const MultidimArray<double> &MDaIn,
+		const MultidimArray<std::complex<double> > &MDaInF,
+		const MultidimArray<double> &MDaRef, std::vector<double> &cand,
+		/*outputs*/
+		double *bestPsi, double *shift_x, double *shift_y,
+		double *bestCoeff) {
+	*(bestPsi) = 0;
+	*(shift_x) = 0.;
+	*(shift_y) = 0.;
+	*(bestCoeff) = 0.0;
+	double rotVar = 0.0;
+	double tempCoeff;
+	double tx, ty;
+	MultidimArray<double> MDaRefRot;
+	MultidimArray<double> MDaRefShiftRot;
+	MultidimArray<double> ccMatrixShift;
+	MultidimArray<double> ccVectorTx;
+	MultidimArray<double> ccVectorTy;
+	MultidimArray<std::complex<double> > MDaRefRotF;
+
+	MDaRefRot.setXmippOrigin();
+	MDaRefShiftRot.setXmippOrigin();
+
+	MultidimArray<double> MDaInShift;
+	MultidimArray<double> MDaInShiftRot;
+	MDaInShift.setXmippOrigin();
+	MDaInShiftRot.setXmippOrigin();
+
+	for (int i = 0; i < peaksFound; ++i) {
+		rotVar = -1. * cand[i];  //negative, because is for reference rotation
+		_applyRotation(MDaRef, rotVar, MDaRefRot); //rotation to reference image
+		_applyFourierImage2(MDaRefRot, MDaRefRotF); //fourier
+		ccMatrix(MDaInF, MDaRefRotF, ccMatrixShift); // cross-correlation matrix
+
+		// testing 2 candidates for each psi
+	    std::vector<double> vTx(2,0.);
+	    std::vector<double> vTy(2,0.);
+	    maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
+	    getShift2(ccVectorTx, vTx, XSIZE(ccMatrixShift));
+	    maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
+	    getShift2(ccVectorTy, vTy, YSIZE(ccMatrixShift));
+
+
+	    //      // todo In case this works properly set a correct condition to "continue"
+	    //		if (std::abs(vTx[0]) > maxShift || std::abs(vTy[0]) > maxShift ||
+	    //				std::abs(vTx[1]) > maxShift || std::abs(vTy[1]) > maxShift)
+	    //			continue;
+
+		double expTx, expTy, expPsi;
+		expPsi = -rotVar;
+        for(int j = 0; j < 2; ++j){
+            for (int k = 0; k < 2; ++k){
+            	//apply transformation to experimental image
+        		expTx = vTx[j];
+        		expTy = vTy[k];
+        		// applying in one transform
+        		_applyShiftAndRotation(MDaIn,expPsi,expTx,expTy,MDaInShiftRot);
+        		circularWindow(MDaInShiftRot); //circular masked MDaInRotShift
+        		pearsonCorr(MDaRef, MDaInShiftRot, tempCoeff);  // Pearson
+        		if (tempCoeff > *(bestCoeff)) {
+        			*(bestCoeff) = tempCoeff;
+        			*(shift_x) = -expTx; //negative because in second loop,when used, this parameters are applied to mdaRef
+        			*(shift_y) = -expTy;
+        			*(bestPsi) = -expPsi;
+        		}
+            }
+        }
 	}
 }
 
@@ -2097,10 +2158,13 @@ void ProgAngularAssignmentMag::getShift(MultidimArray<double> &ccVector,
 	int i;
 	int lb = int(size / 2 - maxShift);
 	int hb = int(size / 2 + maxShift);
-	for (i = lb; i < hb; ++i) {
-		if (dAi(ccVector,i) > maxVal) {
-			maxVal = dAi(ccVector, i);
-			idx = i;
+	for (i = 1; i < size-1; ++i) { //i = lb; i < hb; ++i
+		if( ( dAi(ccVector,size_t(i)) > dAi(ccVector,size_t(i-1) ) )
+				&&( dAi(ccVector,size_t(i)) > dAi(ccVector,size_t(i+1) ) ) ){// is this value a peak value?
+			if (dAi(ccVector,i) > maxVal) { // is the biggest?
+				maxVal = dAi(ccVector, i);
+				idx = i;
+			}
 		}
 	}
 
@@ -2114,6 +2178,54 @@ void ProgAngularAssignmentMag::getShift(MultidimArray<double> &ccVector,
 		shift =0;
 	}
 
+}
+
+/* finds shift as maximum of ccVector */
+void ProgAngularAssignmentMag::getShift2(MultidimArray<double> &ccVector,
+		std::vector<double> &cand, const size_t &size) {
+	double max1 = -1000.;
+	int idx1 = 0;
+	double max2 = -1000.;
+	int idx2 = 0;
+	int i;
+
+	for (i = 1; i < size-1; ++i) { // only look for in range 90:-90
+		// current value is a peak value?
+		if ((dAi(ccVector,size_t(i)) > dAi(ccVector,size_t(i-1) )) && (dAi(ccVector,size_t(i)) > dAi(ccVector,size_t(i+1)) ) ) {
+			if ( dAi(ccVector,i) > max1) {
+				max2 = max1;
+				idx2 = idx1;
+				max1 = dAi(ccVector, i);
+				idx1 = i;
+			}
+			else if ( dAi(ccVector,i) > max2 && dAi(ccVector,i) != max1) {
+				max2 = dAi(ccVector, i);
+				idx2 = i;
+			}
+		}
+	}
+	if(idx1!=0){
+		int maxAccepted=1;
+		std::vector<int> temp;
+		if(idx2!=0){
+			maxAccepted=2;
+			temp.resize(maxAccepted);
+			temp[0] = idx1;
+			temp[1] = idx2;
+		}else{
+			temp.resize(maxAccepted);
+			temp[0] = idx1;
+		}
+
+		double interpIdx; // quadratic interpolated location of peak
+		for (i = 0; i < maxAccepted; ++i) {
+			interpIdx = quadInterp(temp[i], ccVector);
+			cand[i] = double(size) / 2. - interpIdx;
+		}
+	}
+	else{
+		std::cout<<"no peaks!\n";
+	}
 }
 
 /* finds rot as maximum of ccVector for a region near the center */
