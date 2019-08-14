@@ -98,7 +98,7 @@ public: // Internal members
     MultidimArray<double>                   ccVectorRot;
     //    std::vector<double>                     cand; // rotation candidates // fixme defining now as local variable
     int                                     peaksFound = 0; // peaksFound in ccVectorRot
-    double                                  tempCoeff;
+//    double                                  tempCoeff; // FIXME EEEERRROORRR DECLARED AS GLOBAL, BUT USED AS LOCAL IN BESTCAND()
 
     // matrix for neighbors and angular distance
     std::vector< std::vector<int> > neighboursMatrix; // this should be global
@@ -137,6 +137,8 @@ public: // Internal members
     size_t n_ang2;
     double maxShift;
     double sampling;
+
+    int Nsim;
 
 
 public:
@@ -178,8 +180,8 @@ public:
     void _applyRotationAndShift(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
     void _applyShiftAndRotation(const MultidimArray<double> &MDaRef, double &rot, double &tx, double &ty, MultidimArray<double> &MDaRefRot);
 
-    void bestCand(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, /*int &peaksFound,*/ double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
-    void bestCand2(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, /*int &peaksFound,*/ double *bestCandRot, double *shift_x, double *shift_y, double *bestCoeff);
+    void bestCand(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, double &bestCandRot, double &shift_x, double &shift_y, double &bestCoeff);
+    void bestCand2(const MultidimArray<double> &MDaIn, const MultidimArray<std::complex<double> > &MDaInF, const MultidimArray<double> &MDaRef, std::vector<double> &cand, double &bestCandRot, double &shift_x, double &shift_y, double &bestCoeff);
 
     void completeFourierShift(MultidimArray<double> &in, MultidimArray<double> &out);
     void ccMatrix(const MultidimArray<std::complex<double> > &F1, const MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
