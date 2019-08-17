@@ -601,8 +601,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 
 	//	/* search rotation with polar real image representation over 10% of reference images
 	int nCand = int(.10 * sizeMdRef + 1);
-	std::partial_sort(Idx_local.begin(), Idx_local.begin() + nCand,
-			Idx_local.end(),
+	std::partial_sort(Idx_local.begin(),Idx_local.begin()+nCand,Idx_local.end(),
 			[&](int i, int j) {return candidatesFirstLoopCoeff_local[i] > candidatesFirstLoopCoeff_local[j];});
 
 	std::vector<unsigned int> candidatesSecondLoop(nCand, 0);
@@ -629,8 +628,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		double rotVal = -1. * bestPsi_local[Idx_local[k]]; // -1. because i return parameters for reference image instead of experimental
 		double trasXval = -1. * bestTx_local[Idx_local[k]];
 		double trasYval = -1. * bestTy_local[Idx_local[k]];
-		_applyShiftAndRotation(MDaIn, rotVal, trasXval, trasYval,
-				MDaExpShiftRot2);
+		_applyShiftAndRotation(MDaIn,rotVal,trasXval,trasYval,MDaExpShiftRot2);
 		//fourier experimental image
 		_applyFourierImage2(MDaExpShiftRot2, MDaInF);
 		// polar experimental image
@@ -649,7 +647,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		// if its better and shifts are within then update
 		double testShiftTx = bestTx_local[Idx_local[k]] + Tx;
 		double testShiftTy = bestTy_local[Idx_local[k]] + Ty;
-		if (cc_coeff >= candidatesFirstLoopCoeff_local[Idx_local[k]]
+		if (cc_coeff >= candidatesFirstLoopCoeff_local[Idx_local[k]] // todo check this condition
 				&& std::abs(testShiftTx) < maxShift
 				&& std::abs(testShiftTy) < maxShift && std::abs(psi) < 2.) { // todo must define which value and why 2. 5. ?
 			Idx2[k] = k;
@@ -661,8 +659,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		} else { //COSS suggests to degrade this candidate (i.e. coeff--> 0), because it doesn't improve
 			Idx2[k] = k;
 			candidatesSecondLoop[k] = candidatesFirstLoop_local[Idx_local[k]];
-			candidatesSecondLoopCoeff[k] =
-			candidatesFirstLoopCoeff_local[Idx_local[k]]; //candidatesFirstLoopCoeff[Idx[k]];
+			candidatesSecondLoopCoeff[k] =candidatesFirstLoopCoeff_local[Idx_local[k]]; //candidatesFirstLoopCoeff[Idx[k]];
 			// todo check if works better. It seems that for several images in VIRUS there is no any improvement, i.e. all coeff=0
 			bestTx2[k] = bestTx_local[Idx_local[k]];
 			bestTy2[k] = bestTy_local[Idx_local[k]];
@@ -1165,8 +1162,7 @@ MultidimArray<double> ProgAngularAssignmentMag::imToPolar(
 			x_coord = (r * cos(t)) * sfx + cx;
 			y_coord = (r * sin(t)) * sfy + cy;
 			// set value of polar img
-			DIRECT_A2D_ELEM(polarImg,ri-start,ti) = interpolate(cartIm, x_coord,
-					y_coord);
+			DIRECT_A2D_ELEM(polarImg,ri-start,ti) = interpolate(cartIm,x_coord,y_coord);
 		}
 	}
 
@@ -1202,8 +1198,7 @@ MultidimArray<double> ProgAngularAssignmentMag::imToPolar2(
 			y_coord = (r * sin(t)) * sfy + cy;
 
 			// set value of polar img
-			DIRECT_A2D_ELEM(polarImg,ri,ti) = interpolate(cartIm, x_coord,
-					y_coord);
+			DIRECT_A2D_ELEM(polarImg,ri,ti) = interpolate(cartIm,x_coord,y_coord);
 		}
 	}
 
@@ -1230,12 +1225,8 @@ double ProgAngularAssignmentMag::interpolate(MultidimArray<double> &cartIm,
 				+ (x_coord - xf)
 						* ( dAij(cartIm, xc, yf) - dAij(cartIm, xf, yf));
 	} else { // bilinear
-		val =
-				((double) (( dAij(cartIm,xf,yf) * (yc - y_coord)
-						+ dAij(cartIm,xf,yc) * (y_coord - yf)) * (xc - x_coord))
-						+ (double) (( dAij(cartIm,xc,yf) * (yc - y_coord)
-								+ dAij(cartIm,xc,yc) * (y_coord - yf))
-								* (x_coord - xf)))
+		val = ((double) (( dAij(cartIm,xf,yf) * (yc - y_coord) + dAij(cartIm,xf,yc) * (y_coord - yf)) * (xc - x_coord))
+						+ (double) (( dAij(cartIm,xc,yf) * (yc - y_coord)+ dAij(cartIm,xc,yc) * (y_coord - yf))	* (x_coord - xf)))
 						/ (double) ((xc - xf) * (yc - yf));
 	}
 
@@ -1464,10 +1455,7 @@ double quadInterp(/*const*/int idx, MultidimArray<double> &in) {
 	double oneBefore = dAi(in, idxBef);
 	double oneAfter = dAi(in, idxAft);
 	double centralOne = dAi(in, idx);
-	double InterpIdx = idx
-			- (( dAi(in,idx+1) - dAi(in, idx - 1))
-					/ ( dAi(in,idx+1) + dAi(in, idx - 1) - 2 * dAi(in, idx)))
-					/ 2.;
+	double InterpIdx = idx	- (( dAi(in,idx+1) - dAi(in, idx - 1))/ ( dAi(in,idx+1) + dAi(in, idx - 1) - 2 * dAi(in, idx)))/ 2.;
 	return InterpIdx;
 }
 
@@ -1705,14 +1693,13 @@ const MultidimArray<double> &MDaIn,
 
 		circularWindow(MDaInShiftRot); //circular masked MDaInRotShift
 		// TODO compute another metric and check agreement between them in order to select better candidates
-		// todo probably, candidate selection is good enough to at least have good candidates in top positions
-		//      then in second loop could be useful to compute another metric, as a "second criteria" as in regularization
+		// todo probably, candidate selection in first loop is good enough to at least have good candidates in top positions
+		//      then in second loop could be useful to compute another metric, as a "second criteria" like in regularization
 		//      could be useful to check information given by neighbors. e.g. low variance in alignment parameters in each neighborhood
 		pearsonCorr(MDaRef, MDaInShiftRot, tempCoeff);  // Pearson
 		//		normalized_cc(MDaRef, MDaInShiftRot, tempCoeff); // NCC
 		//		imNormalized_cc(MDaRef, MDaInShiftRot, tempCoeff); // IMNCC
 		//		imZNCC(MDaRef, MDaInShiftRot, tempCoeff); // IMZNCC
-		// TODO COSS suggests use MDaRef as "mask"
 		if (tempCoeff > bestCoeff) {
 			bestCoeff = tempCoeff;
 			shift_x = -expTx; //negative because in second loop,when used, this parameters are applied to mdaRef
@@ -1972,8 +1959,8 @@ void ProgAngularAssignmentMag::getShift(MultidimArray<double> &ccVector,
 	int lb = int(size / 2 - maxShift);
 	int hb = int(size / 2 + maxShift);
 	for (i = 1; i < size - 1; ++i) { //i = lb; i < hb; ++i
-		if (( dAi(ccVector,size_t(i)) > dAi(ccVector, size_t(i - 1)))
-				&& ( dAi(ccVector,size_t(i)) > dAi(ccVector, size_t(i + 1)))) { // is this value a peak value?
+		if (( dAi(ccVector,size_t(i)) > dAi(ccVector, size_t(i - 1))) &&
+				( dAi(ccVector,size_t(i)) > dAi(ccVector, size_t(i + 1)))) { // is this value a peak value?
 			if (dAi(ccVector,i) > maxVal) { // is the biggest?
 				maxVal = dAi(ccVector, i);
 				idx = i;
@@ -2050,7 +2037,7 @@ void ProgAngularAssignmentMag::getRot(MultidimArray<double> &ccVector,
 	int lb = 89;
 	int hb = 270;
 	for (i = lb; i < hb + 1; ++i) {
-		if (dAi(ccVector,i) > maxVal) {
+		if (dAi(ccVector,i) > maxVal) { // fixme must check first if current value is peak value
 			maxVal = dAi(ccVector, i);
 			idx = i;
 		}
