@@ -348,14 +348,18 @@ def getBranch(repo, repo_dir):
 
 def getDefaultBranch(repo):
     log = []
-    key = 'HEAD branch:'
+    key = 'HEAD branch'
     result = runJob('git remote show %s' % REPOSITORIES[repo],
         show_output=False, log=log, show_command=False)
     if result:
         for l in log:
             if key in l:
-                branch = l.split(key)[1] # HEAD branch: devel
-                return (True, branch.strip())
+                if not "remote HEAD is ambiguous" in l:
+                    branch = l.split(key+":")[1] # HEAD branch: devel
+                    return (True, branch.strip())
+                else:
+                    return (True, "devel")
+
     print(red('Cannot get defaul branch for ' + repo))
     return (False, None)
 
