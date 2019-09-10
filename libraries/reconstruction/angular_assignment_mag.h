@@ -96,9 +96,7 @@ public: // Internal members
     // CCV result matrix
     MultidimArray<double>                   ccMatrixRot;
     MultidimArray<double>                   ccVectorRot;
-    //    std::vector<double>                     cand; // rotation candidates // fixme defining now as local variable
     int                                     peaksFound = 0; // peaksFound in ccVectorRot
-//    double                                  tempCoeff; // FIXME EEEERRROORRR DECLARED AS GLOBAL, BUT USED AS LOCAL IN BESTCAND()
 
     // matrix for neighbors and angular distance
     std::vector< std::vector<int> > neighboursMatrix; // this should be global
@@ -188,6 +186,7 @@ public:
     void ccMatrixPCO(MultidimArray<std::complex<double> > &F1, MultidimArray<std::complex<double> > &F2, MultidimArray<double> &result);
     void computeHann();
     void computingNeighborGraph();
+    void computingNeighborGraph2();
     void computeCircular();
     void circularWindow(MultidimArray<double> &in);
 

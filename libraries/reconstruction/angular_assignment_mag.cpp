@@ -47,7 +47,7 @@ void ProgAngularAssignmentMag::defineParams() {
 	addParamsLine("  [-odir <outputDir=\".\">]   : Output directory");
 	addParamsLine("  [-sym <symfile=c1>]         : Enforce symmetry in projections");
 	addParamsLine("  [-sampling <sampling=1.>]         : sampling");
-	addParamsLine("  [--Nsimultaneous <Nsim=1.>]       : number of simultaneous");
+	//addParamsLine("  [--Nsimultaneous <Nsim=1.>]       : number of simultaneous");
 }
 
 // Read arguments ==========================================================
@@ -60,7 +60,7 @@ void ProgAngularAssignmentMag::readParams() {
 	sampling = getDoubleParam("-sampling");
 	XmippMetadataProgram::oroot = fnDir;
 	fnSym = getParam("-sym");
-	Nsim=getIntParam("--Nsimultaneous"); //unused when MPI=1
+	//Nsim=getIntParam("--Nsimultaneous"); //unused when MPI=1
 }
 
 // Show ====================================================================
@@ -124,10 +124,13 @@ void neighVariance(Matrix1D<double> &neigh, double &retVal) {
 	retVal = sum / N;
 }
 
+/*
+ * In this method for each direction look for neighbors of size 3
+ * nearest 2 neighbors to each direction
+ * */
 void ProgAngularAssignmentMag::computingNeighborGraph() {
-
-	//	std::ofstream outfile("/home/jeison/Escritorio/testNeighbours.txt");
-	//	outfile<< "Idx" << "\t" << "distance" <<"    \t    \n\n";
+std::ofstream outfile("/home/jeison/Escritorio/testNeighbours.txt");
+outfile<< "Idx" << "\t" << "distance" <<"    \t    \n\n";
 
 	double factor = 180. / 3.141592653;
 	N_neighbors = 3; // including candidate itself
@@ -175,11 +178,11 @@ void ProgAngularAssignmentMag::computingNeighborGraph() {
 
 		for (int i = 0; i < N_neighbors; ++i) {
 			nearNeighbors.at(i) = allNeighborsjp.at(i); //
-			VEC_ELEM(nearNeighborsDist,i) = distanceToj[nearNeighbors[i]]
-					* factor; // for compute mean and std;
+			VEC_ELEM(nearNeighborsDist,i) = distanceToj[nearNeighbors[i]]* factor; // for compute mean and std;
 			//			outfile<< nearNeighbors[i] << " \t  " << VEC_ELEM(nearNeighborsDist,i) <<"  \t  ";
+outfile<<nearNeighbors[i]<<"\t";
 		}
-		//		outfile<<"\n";
+		outfile<<"\n";
 
 		//		double meanAngDist=0.;
 		double varAngDist = 0.;
@@ -198,7 +201,67 @@ void ProgAngularAssignmentMag::computingNeighborGraph() {
 		neighboursMatrix.push_back(nearNeighbors);
 		neighboursWeights.push_back(vecNearNeighborsWeights);
 	}
-	//	outfile.close();
+outfile.close();
+}
+
+/*
+ * In this method for each direction look for neighbors within certain distance
+ * */
+void ProgAngularAssignmentMag::computingNeighborGraph2() {
+std::ofstream outfile("/home/jeison/Escritorio/testNewNeighbours.txt");
+std::ofstream weightsFile("/home/jeison/Escritorio/testNewNeighboursWeights.txt");
+    double factor = 180. / 3.141592653;
+	std::vector< std::vector<int> > allNeighborsjp;
+	std::vector< std::vector<double> > allWeightsjp;
+	Matrix1D<double> distanceToj, dirj, dirjp;
+	double maxSphericalDistance=5.; // FIXME this value should be related to parameters of sampling of the unary sphere 12 para phantom, 5. virus de 119 (samplig-rate 3.)
+	// this parameter should not be much bigger than sampling_rate in xmipp_mpi_angular_project_library
+	printf("processing neighbors graph...\n");
+	FOR_ALL_OBJECTS_IN_METADATA(mdRef){
+		double rotj, tiltj, psij;
+		mdRef.getValue(MDL_ANGLE_ROT, rotj, __iter.objId);
+		mdRef.getValue(MDL_ANGLE_TILT, tiltj, __iter.objId);
+		mdRef.getValue(MDL_ANGLE_PSI, psij, __iter.objId);
+		distanceToj.initZeros(sizeMdRef);
+		Euler_direction(rotj, tiltj, psij, dirj);
+		int jp = -1;
+		std::vector<int> neighborsjp;
+		std::vector<double> weightsjp;
+		double thisSphericalDistance=0.;
+		for (MDIterator __iter2(mdRef); __iter2.hasNext(); __iter2.moveNext()){
+			jp += 1;
+			double rotjp, tiltjp, psijp;
+			mdRef.getValue(MDL_ANGLE_ROT, rotjp, __iter2.objId);
+			mdRef.getValue(MDL_ANGLE_TILT, tiltjp, __iter2.objId);
+			mdRef.getValue(MDL_ANGLE_PSI, psijp, __iter2.objId);
+			Euler_direction(rotjp, tiltjp, psijp, dirjp);
+			thisSphericalDistance=spherical_distance(dirj, dirjp)*factor;
+
+			if(thisSphericalDistance<maxSphericalDistance){
+				neighborsjp.push_back(jp);
+				double val=exp(- thisSphericalDistance/maxSphericalDistance ); // should generate values (1/e, 1.0)
+				weightsjp.push_back(val);
+			}
+		}
+		allNeighborsjp.push_back(neighborsjp);
+		allWeightsjp.push_back(weightsjp);
+
+// writing outfile to test
+for(std::vector<int>::iterator it=neighborsjp.begin(); it!=neighborsjp.end();++it){
+	outfile<<*it<<"\t";
+}
+outfile<<"\n";
+
+// writing outfile to test
+for(std::vector<double>::iterator it=weightsjp.begin(); it!=weightsjp.end();++it){
+	weightsFile<<*it<<"\t";
+}
+weightsFile<<"\n";
+
+	}
+
+outfile.close();
+weightsFile.close();
 }
 
 void ProgAngularAssignmentMag::preProcess() {
@@ -297,16 +360,18 @@ void ProgAngularAssignmentMag::preProcess() {
 	//	bestTy.resize(sizeMdRef);
 	//	bestPsi.resize(sizeMdRef);
 
-	mdOut.setComment(
-			"experiment for metadata output containing data for reconstruction");
+	mdOut.setComment("experiment for metadata output containing data for reconstruction");
 
 	// Define the neighborhood graph
-	//	computingNeighborGraph();
+//computingNeighborGraph();
+	computingNeighborGraph2();
 
 }
 
 void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		const FileName &fnImgOut, const MDRow &rowIn, MDRow &rowOut) {
+
+std::ofstream outfile("/home/jeison/Escritorio/testVectCC.txt");
 
 	// experimental image related
 	rowOut = rowIn;
@@ -364,10 +429,12 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		Idx_local[k] = k; // for sorting
 		candidatesFirstLoop_local[k] = k; // for access in second loop
 		candidatesFirstLoopCoeff_local[k] = cc_coeff;
+outfile<<cc_coeff<<"\n";
 		bestTx_local[k] = Tx;
 		bestTy_local[k] = Ty;
 		bestPsi_local[k] = psi;
 	}
+outfile.close();
 
 	/*  // skip second loop, and sort to get top candidates
 	 // choose nCand of the candidates with best corrCoeff
@@ -632,8 +699,8 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		//fourier experimental image
 		_applyFourierImage2(MDaExpShiftRot2, MDaInF);
 		// polar experimental image
-		inPolar = imToPolar(MDaExpShiftRot2, first, n_rad); // this process can be expensive
-		_applyFourierImage2(inPolar, MDaInAuxF, n_ang); // todo check!! , at least first time, i am using the same transformer that i use in the past loop which have a different size
+		inPolar = imToPolar(MDaExpShiftRot2, first, n_rad);
+		_applyFourierImage2(inPolar, MDaInAuxF, n_ang); // todo check!!  at least first time, i am using the same transformer that i use in the past loop which have a different size
 
 		// find rotation and shift
 		ccMatrix(MDaInAuxF,vecMDaRef_polarF[candidatesFirstLoop_local[Idx_local[k]]],ccMatrixRot2);
@@ -647,9 +714,9 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 		// if its better and shifts are within then update
 		double testShiftTx = bestTx_local[Idx_local[k]] + Tx;
 		double testShiftTy = bestTy_local[Idx_local[k]] + Ty;
-		if (cc_coeff >= candidatesFirstLoopCoeff_local[Idx_local[k]] // todo check this condition
+		if (cc_coeff > candidatesFirstLoopCoeff_local[Idx_local[k]]
 				&& std::abs(testShiftTx) < maxShift
-				&& std::abs(testShiftTy) < maxShift && std::abs(psi) < 2.) { // todo must define which value and why 2. 5. ?
+				&& std::abs(testShiftTy) < maxShift /*&& std::abs(psi) < 2.*/) { // todo must define which value and why 2. 5. ? --> better remove psi condition
 			Idx2[k] = k;
 			candidatesSecondLoop[k] = candidatesFirstLoop_local[Idx_local[k]];
 			candidatesSecondLoopCoeff[k] = cc_coeff;
@@ -669,8 +736,7 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 
 	// choose nCand of the candidates with best corrCoeff
 	//	int nCand = 1; // 1  3
-	std::sort(Idx2.begin(), Idx2.end(),
-			[&](int i, int j) {return candidatesSecondLoopCoeff[i] > candidatesSecondLoopCoeff[j];});
+	std::sort(Idx2.begin(), Idx2.end(),	[&](int i, int j) {return candidatesSecondLoopCoeff[i] > candidatesSecondLoopCoeff[j];});
 
 	// reading info of reference image candidate
 	double rotRef, tiltRef;
@@ -697,11 +763,10 @@ void ProgAngularAssignmentMag::processImage(const FileName &fnImg,
 }
 
 void ProgAngularAssignmentMag::postProcess() {
-
 	// from angularContinousAssign2
 	MetaData &ptrMdOut = *getOutputMd();
 	ptrMdOut.removeDisabled();
-	/*  // todo ask if this is the correct way to do this weighting, because later in highres protocol there is another weighting step
+	//	/*  // todo ask if this is the correct way to do this weighting, because later in highres protocol there is another weighting step
 	 double maxCC = -1.;
 	 FOR_ALL_OBJECTS_IN_METADATA(ptrMdOut)
 	 {
