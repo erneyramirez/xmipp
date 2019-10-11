@@ -141,7 +141,8 @@ else:
 dirs = ['external','external','external','libraries','libraries','libraries','libraries','libraries']
 patterns=['condor/*.cpp','delaunay/*.cpp','gtest/*.cc','data/*.cpp','reconstruction/*.cpp',
 		'classification/*.cpp','dimred/*.cpp','interface/*.cpp']
-addLib('Xmipp', dirs=dirs, patterns=patterns, incs=python_incdirs, libs=['python2.7', 'fftw3f', 'fftw3f_threads'])
+addLib('Xmipp', dirs=dirs, patterns=patterns, incs=python_incdirs,
+       libs=['pthread','python3.5m', 'fftw3f', 'fftw3f_threads'])
 
 
 # FRM library
