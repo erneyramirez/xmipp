@@ -957,7 +957,7 @@ def compileModule(Nproc,module):
             # expected error: 'scons: *** [some/program/to/compile] Error 1'
             failingBin = re.match("scons: \*\*\* \[(.*)\] Error .*", l)
             if failingBin:
-                for k, v in SKIPPABLE_BINS.iteritems():
+                for k, v in SKIPPABLE_BINS.items():
                     if k in failingBin.group(1):
                         print(red("\nSome error found compiling '%s' program."
                                   % failingBin.group(1).split('/')[-1]))
@@ -1384,19 +1384,12 @@ def ensureGit():
         return False
     return True
 
-
-def getScriptVersion():
-    scriptName = os.path.basename(__file__)
-    lastCommit = []
-    # get hash of the last commit changing this script
-    runJob('git log -n 1 --pretty=format:%H -- ' + scriptName, '.', False, lastCommit, False)
-    return lastCommit[0].strip()
-
 if __name__ == '__main__':
     # I comment this line to avoid problems if this script is run in XmippBundle/src/xmipp  or directly from XmippBundle/.
     # os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-    XMIPP_SCRIPT_VERSION = getScriptVersion()
+    # import time
+    # time.sleep(5)
 
     if not ensureGit():
         sys.exit(-1)
@@ -1449,11 +1442,11 @@ if __name__ == '__main__':
             sys.exit(1)
     elif mode=="compile":
         Nproc = 8 if n<3 else sys.argv[2]
+        compileDependencies(Nproc)
         if n<=3:
             ok = compile(Nproc)
             module = 'Xmipp'
         else:
-            compileDependencies(Nproc)
             ok = compileModule(Nproc,sys.argv[3])
             module = sys.argv[3]
         if ok:
@@ -1469,6 +1462,7 @@ if __name__ == '__main__':
             Nproc=sys.argv[2]
         else:
             Nproc=8
+        compileDependencies(Nproc)
         compile(Nproc)
         install("build")
     elif mode=="install":
@@ -1506,6 +1500,7 @@ if __name__ == '__main__':
             and downloadDeepLearningModels('build')
             and getDependencies()
             and getSources(branch)
+            and compileDependencies(Nproc)
             and compile(Nproc)
             and install('build'))
         if ok:
