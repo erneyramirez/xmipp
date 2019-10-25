@@ -160,7 +160,7 @@ if cuda:
 # MPI
 dirs = ['libraries']
 patterns=['parallel/*.cpp']
-addLib('XmippParallel',dirs=dirs,patterns=patterns, incs=python_incdirs, libs=['Xmipp', 'python2.7'], mpi=True)
+addLib('XmippParallel',dirs=dirs,patterns=patterns, incs=python_incdirs, libs=['Xmipp', 'python3.5m'], mpi=True)
 
 
 #  ***********************************************************************
@@ -228,7 +228,7 @@ PROGRAMS_WITH_OPENCV_AND_CUDA = ['movie_optical_alignment_gpu']
 for p in glob(os.path.join(XMIPP_PATH,'applications','programs','*')):
 	pname = os.path.basename(p)
 	if pname in PROGRAMS_WITH_PYTHON:
-		addProg(pname,incs=python_incdirs,libs=['python2.7'])
+		addProg(pname,incs=python_incdirs,libs=['python3.5m'])
 	elif pname in PROGRAMS_WITH_OPENCV:
 		if opencv:
 			addProg(pname,libs=opencvLibs,deps=['opencv'])
@@ -251,7 +251,7 @@ addLib('xmippLib.so',
        dirs=['bindings'],
        patterns=['python/*.cpp'],
        incs=python_incdirs,
-       libs=['python2.7', 'XmippCore', 'Xmipp', 'fftw3f'],
+       libs=['python3.5m', 'XmippCore', 'Xmipp', 'fftw3f'],
        prefix='', target='xmippLib')
        
 #  ***********************************************************************
