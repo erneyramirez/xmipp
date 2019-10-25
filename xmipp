@@ -191,7 +191,7 @@ def checkProgram(programName, show=True):
     systemInstructions["scons"] = ['sudo apt-get -y install scons or make sure that Scipion Scons is in the path',"sudo pacman -Syu --noconfirm scons"]
     systemInstructions["javac"] = ['sudo apt-get -y install default-jdk default-jre',"sudo pacman -Syu --noconfirm jre"]
     systemInstructions["rsync"] = ["sudo apt-get -y install rsync" , "sudo pacman -Syu --noconfirm rsync"]
-    systemInstructions["pip"] = ["sudo apt-get -y install python-pip" , "sudo pacman -Syu --noconfirm rsync"]
+    systemInstructions["pip"] = ["sudo apt-get -y install python3-pip" , "sudo pacman -Syu --noconfirm rsync"]
     ok=True
     cont = True
     if not whereis(programName):
@@ -446,7 +446,8 @@ def createEmptyConfig():
               'LINKFLAGS','PYTHONINCFLAGS','MPI_CC','MPI_CXX','MPI_LINKERFORPROGRAMS','MPI_CXXFLAGS',
               'MPI_LINKFLAGS','NVCC','CXX_CUDA','NVCC_CXXFLAGS','NVCC_LINKFLAGS',
               'MATLAB_DIR','CUDA','DEBUG','MATLAB','OPENCV','OPENCVSUPPORTSCUDA','OPENCV3',
-              'JAVA_HOME','JAVA_BINDIR','JAVAC','JAR','JNI_CPPPATH', 'USE_DL', 'VERIFIED', 'CONFIG_VERSION']
+              'JAVA_HOME','JAVA_BINDIR','JAVAC','JAR','JNI_CPPPATH', 'USE_DL', 'VERIFIED',
+              'CONFIG_VERSION', 'PYTHON_LIB']
     configDict = {}
     for label in labels:
         configDict[label]=""
@@ -566,6 +567,11 @@ def configCompiler(configDict):
                 configDict["INCDIRFLAGS"]+=" -I/usr/include/hdf5/serial"
                 incDirs += ["/usr/include/hdf5/serial"]
 
+    if configDict["PYTHON_LIB"] == "":
+
+        configDict["PYTHON_LIB"] = "python%s.%sm" % (sys.version_info.major, sys.version_info.minor)
+
+
     if configDict["PYTHONINCFLAGS"] == "":
         incDirs=[]
 
@@ -661,12 +667,14 @@ int main(){}
         return False
     runJob("rm xmipp_mpi_test_main*")
 
-    echoString = "This sentence should be printed 4 times if mpi runs fine"
     ok = False
     if checkProgram("mpirun",False):
+        echoString = "This sentence should be printed 4 times if mpi runs fine"
         ok=(runJob("mpirun -np 4 echo '%s (by mpirun).'" % echoString) or
             runJob("mpirun -np 4 --allow-run-as-root echo '%s (by mpirun).'" % echoString))
     elif checkProgram("mpiexec",False):
+        # FIXME The variable echoString does not declared here
+        echoString = "This sentence should be printed 4 times if mpi runs fine"
         ok=(runJob("mpiexec -np 4 echo '%s (by mpiexec).'" % echoString) or
             runJob("mpiexec -np 4 --allow-run-as-root echo '%s (by mpiexec).'" % echoString))
     else:
@@ -739,7 +747,7 @@ def configCuda(configDict):
         if configDict["NVCC"]=="":
             if checkProgram("nvcc"):
                 nvccVersion, nvccFullVersion = getCudaVersion("nvcc")
-                if nvccVersion != 8.0 and not 'XMIPP_ALLOW_ANY_CUDA' in os.environ:
+                if nvccVersion != 8.0:
                     print(red('Detected CUDA-' + nvccFullVersion + '. Version 8.0 is required.'))
                     print(red("Skipping CUDA compilation. Please, set cuda-8.0 as default "
                               "to be able to use Xmipp Cuda programs.'"))
@@ -751,8 +759,7 @@ def configCuda(configDict):
             # get rid of it: 'ccache g++' -> 'g++'
             candidate = configDict["CXX"].split()[-1]
             cxxVersion, cxxStrVersion = getGccVersion(candidate)
-            nvccVersion, nvccFullVersion = getCudaVersion(configDict["NVCC"])
-            if cxxVersion >= 6 and nvccVersion <= 8:
+            if cxxVersion >= 6:
                 compVers = ['5', '5.5', '5.4', '5.3', '5.2', '5.1', '4.9', '4.8']
                 print(red("%s version later than 5 detected. Looking for an alternative "
                           "for CUDA compilations... (g++-v: %s)"
@@ -773,7 +780,7 @@ def configCuda(configDict):
             else:
                 configDict["CXX_CUDA"] = candidate
             configDict["NVCC_CXXFLAGS"] = ("--x cu -D_FORCE_INLINES -Xcompiler -fPIC "
-                                           "-ccbin %(CXX_CUDA)s -std=c++11 --expt-extended-lambda "
+                                           "-ccbin %(CXX_CUDA)s -std=c++11 "
                                            # generate PTX only, and SASS at the runtime (by setting code=virtual_arch)
                                            "-gencode=arch=compute_30,code=compute_30 "
                                            "-gencode=arch=compute_35,code=compute_35 "
@@ -881,19 +888,6 @@ def config_DL(configDict):
         configDict[k] = 'False'
 
 
-def configConfigVersion(configDict):
-    key = 'CONFIG_VERSION'
-    configDict[key] = getScriptVersion()
-
-
-def ensureConfigVersion(configDict):
-    key = 'CONFIG_VERSION'
-    if key not in configDict or configDict[key] != XMIPP_SCRIPT_VERSION:
-        print(red('We did some changes which are not compatible with your current config file. '
-                  'We recommend you to create a backup before regenerating it (use --help for additional info)'))
-        exit(-1)
-
-
 def config():
     print("Configuring -----------------------------------------")
     new_config_dict = createEmptyConfig()
@@ -911,7 +905,6 @@ def config():
     configCuda(new_config_dict)
     configMatlab(new_config_dict)
     config_DL(new_config_dict)
-    configConfigVersion(new_config_dict)
 
     writeConfig(new_config_dict)
     print(green("Configuration completed....."))
@@ -985,14 +978,6 @@ def compile_cuFFTAdvisor():
     return ok and runJob("cp " + advisorDir + "build/libcuFFTAdvisor.so" + " " + libDir)
 
 
-def compile(Nproc):
-    ensureConfig()
-    ensureConfigVersion(configDict)
-    if not compileDependencies(Nproc):
-        return False
-    return compileXmipp(Nproc)
-
-
 def compileDependencies(Nproc):
     print("Building Dependencies -------------------------------------")
     result = True
@@ -1003,8 +988,9 @@ def compileDependencies(Nproc):
     return result
 
 
-def compileXmipp(Nproc):
+def compile(Nproc):
     print("Compiling -------------------------------------------")
+    ensureConfig()
     if not compileModule(Nproc,"xmippCore"):
         return False
     if not compileModule(Nproc,"xmipp"):
@@ -1067,7 +1053,7 @@ def getPython():
     # if scipionHome is not None:
     #     python = os.path.join(os.environ['SCIPION_HOME'], 'software', 'bin', 'python')
     # else:
-    python = 'python'
+    python = 'python3'
     return python
 
 def addDeepLearninModel(login, modelPath='', update=None):
@@ -1159,6 +1145,7 @@ def downloadDeepLearningModels(cwd, dedicatedMode=False):
 def install(dirname):
     print("Installing ------------------------------------------")
     cpCmd = "rsync -LptgoD" if checkProgram("rsync", False) else "cp"
+    #cpCmd = "cp -R"
     ok = True
 
     createDir(dirname)
@@ -1221,12 +1208,12 @@ def install(dirname):
     fhBash.write("export XMIPP_SRC=%s\n"%XMIPP_SRC)
     fhFish.write("set -x XMIPP_SRC %s\n"%XMIPP_SRC)
 
-    # SCIPION_HOME = getScipionHome()
-    # if SCIPION_HOME:
-    #     fhBash.write("export PATH=$SCIPION_HOME/software/bin:$PATH\n")
-    #     fhBash.write("export LD_LIBRARY_PATH=$SCIPION_HOME/software/lib:$LD_LIBRARY_PATH\n")
-    #     fhFish.write("set -px PATH $SCIPION_HOME/software/bin\n")
-    #     fhFish.write("set -px LD_LIBRARY_PATH $SCIPION_HOME/software/lib\n")
+    SCIPION_HOME = getScipionHome()
+    if SCIPION_HOME:
+        fhBash.write("export PATH=$SCIPION_HOME/software/bin:$PATH\n")
+        fhBash.write("export LD_LIBRARY_PATH=$SCIPION_HOME/software/lib:$LD_LIBRARY_PATH\n")
+        #fhFish.write("set -px PATH $SCIPION_HOME/software/bin\n")
+        fhFish.write("set -px LD_LIBRARY_PATH $SCIPION_HOME/software/lib\n")
     fhBash.write("export PATH=%s/bin:$PATH\n"%XMIPP_HOME)
     fhBash.write("export LD_LIBRARY_PATH=%s/lib:%s/bindings/python:$LD_LIBRARY_PATH\n"%(XMIPP_HOME,XMIPP_HOME))
     fhBash.write("export PYTHONPATH=%s/bindings/python:%s/pylib:$PYTHONPATH\n"%(XMIPP_HOME,XMIPP_HOME))
