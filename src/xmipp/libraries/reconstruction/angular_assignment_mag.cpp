@@ -566,7 +566,7 @@ ccvec.write("/home/jeison/Escritorio/testVectCC_1stLoop.txt");
 			applyShiftAndRotation(MDaIn,rotVal,trasXval,trasYval,MDaExpShiftRot2);
 			//Fourier of transformed experimental image
 			applyFourierImage2(MDaExpShiftRot2, MDaInF);
-			// polar experimental image
+			// polar of transformed experimental image
 			inPolar = imToPolar(MDaExpShiftRot2, first, n_rad);
 			applyFourierImage3(inPolar, MDaInAuxF, n_ang);
 
@@ -705,6 +705,8 @@ void ProgAngularAssignmentMag::postProcess() {
 
 double duration = ( std::clock() - Inicio ) / (double) CLOCKS_PER_SEC;
 std::cout << "processing images in this group takes "<< duration << " seconds" << std::endl;
+//	MetaData &ptrMdOut = *getOutputMd();
+//	ptrMdOut.write(XmippMetadataProgram::fn_out.replaceExtension("xmd"));
 
 	// from angularContinousAssign2
 	MetaData &ptrMdOut = *getOutputMd();
@@ -715,8 +717,8 @@ std::cout << "processing images in this group takes "<< duration << " seconds" <
 		 ptrMdOut.getValue(MDL_MAXCC, thisMaxCC, __iter.objId);
 		 if (thisMaxCC > maxCC)
 			 maxCC = thisMaxCC;
-		 if (thisMaxCC == 0)
-			 ptrMdOut.removeObject(__iter.objId);
+		 if (thisMaxCC == 0) // mirar si causa rampa
+			 ptrMdOut.removeObject(__iter.objId); // esto no está en angularContinousAssign2
 	 }
 	 FOR_ALL_OBJECTS_IN_METADATA(ptrMdOut){
 		 double thisMaxCC;
@@ -726,6 +728,15 @@ std::cout << "processing images in this group takes "<< duration << " seconds" <
 	 }
 
 	ptrMdOut.write(XmippMetadataProgram::fn_out.replaceExtension("xmd"));
+
+	/*// postprocess method before changing weights within each group of experimental images
+	 *  //probar sin hacer nada en este método
+	mdOut = *getOutputMd(); // una forma de capturar los valores de salida
+    mdOut.write(fnDir.getString()+fnOut.getString()); // +String("outfileMD.xmd")
+    transformerImage.cleanup(); // estas cosas causaban error
+    transformerPolarImage.cleanup();
+    *getOutputMd();
+	 * */
 }
 
 /* Pearson Coeff. ZNCC zero-mean normalized cross-corr*/
@@ -1316,10 +1327,10 @@ std::cout<<"size in ccMatrix full: "<< YSIZE(F1) <<" x "<< 2 * (XSIZE(F1) - 1) <
 		b = (*(ptrFFT1 + 1))* dSize; // * dSize;
 		c = (*ptrFFT2++);
 		d = (*ptrFFT2++) * (-1);
-		double den=c * c + d * d;
-		if(den<=0){
-			std::cout<<"zero or negative denominator!!\n";
-		}
+//double den=c * c + d * d;
+//if(den<=0){
+//	std::cout<<"zero or negative denominator!!\n";
+//}
 		//Compactly supported correlation REMOVED. F2 is reference image
 		*ptrFFT1++ = (a * c - b * d); // / sqrt(den) ;
 		*ptrFFT1++ = (b * c + a * d); // / sqrt(den) ;
@@ -1595,7 +1606,7 @@ void ProgAngularAssignmentMag::rotCandidates(MultidimArray<double> &in,
  * vector<double> cand contains candidates to relative rotation between images
  */
 void ProgAngularAssignmentMag::bestCand(/*inputs*/
-const MultidimArray<double> &MDaIn,
+		const MultidimArray<double> &MDaIn,
 		const MultidimArray<std::complex<double> > &MDaInF,
 		const MultidimArray<double> &MDaRef, std::vector<double> &cand,
 		/*outputs*/
