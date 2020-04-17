@@ -31,6 +31,7 @@
 #include <core/xmipp_fftw.h>
 #include <core/metadata_extension.h>
 #include <core/multidim_array.h>
+#include <core/symmetries.h>
 #include <data/mask.h>
 #include <data/filters.h>
 
@@ -117,6 +118,13 @@ public:
     double sampling;
     double angStep;
 
+    // Symmetry list
+    SymList SL;
+    // Left matrices for the symmetry transformations
+    std::vector< Matrix2D<double> > L;
+    // Right matrices for the symmetry transformations
+    std::vector< Matrix2D<double> > R;
+
 // borrar
 double Inicio;
 
@@ -199,7 +207,8 @@ double Inicio;
     void pearsonCorr(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
 
     void rotCandidates3(MultidimArray<double> &in, std::vector<double> &cand, const size_t &size);
-    void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size /*,int *nPeaksFound*/);
+    void rotCandidates2(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size);
+    void rotCandidates(MultidimArray<double> &in, std::vector<double>& cand, const size_t &size);
 
     void ssimIndex(MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
     void ssimIndex(const MultidimArray<double> &X, MultidimArray<double> &Y, double &coeff);
