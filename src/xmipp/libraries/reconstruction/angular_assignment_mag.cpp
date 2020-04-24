@@ -584,6 +584,7 @@ ccvec.write("/home/jeison/Escritorio/testVectCC_1stLoop.txt");
 
 	// ordering using cross-corr coefficient values computed in first loop
 	// only best reference directions should be refined with polar real-space alignment
+
 	std::partial_sort(Idx.begin(), Idx.begin()+nCand, Idx.end(),
 			[&candidatesFirstLoopCoeff](int i, int j) {return candidatesFirstLoopCoeff[i] > candidatesFirstLoopCoeff[j];});
 
@@ -606,9 +607,9 @@ ccvec.write("/home/jeison/Escritorio/testVectCC_1stLoop.txt");
 	for(int k = 0; k < sizeMdRef; ++k) {
 		if(k<nCand){
 			//apply transform to experimental image
-			double rotVal = -1. * bestPsi[Idx[k]]; // -1. because I return parameters for reference image instead of experimental
-			double trasXval = -1. * bestTx[Idx[k]];
-			double trasYval = -1. * bestTy[Idx[k]];
+			double rotVal = bestPsi[Idx[k]];
+			double trasXval = bestTx[Idx[k]];
+			double trasYval = bestTy[Idx[k]];
 			applyShiftAndRotation(MDaIn,rotVal,trasXval,trasYval,MDaExpShiftRot2);
 			//Fourier of transformed experimental image
 			applyFourierImage2(MDaExpShiftRot2, MDaInF);
@@ -648,6 +649,7 @@ ccvec.write("/home/jeison/Escritorio/testVectCC_1stLoop.txt");
 				bestPsi2[Idx[k]] = bestPsi[Idx[k]];
 			}
 		}// end if(k<nCand)
+
 		else{
 			Idx2[k] = k;
 			Idx3[k] = k;
@@ -769,9 +771,9 @@ testCounter2+=1;// */
 	rowOut.setValue(MDL_WEIGHT_SIGNIFICANT, 1.);
 	rowOut.setValue(MDL_ANGLE_ROT, rotRef);
 	rowOut.setValue(MDL_ANGLE_TILT, tiltRef);
-	rowOut.setValue(MDL_ANGLE_PSI, realWRAP(bestPsi2[Idx2[0]], -180., 180.));
-	rowOut.setValue(MDL_SHIFT_X, -bestTx2[Idx2[0]]);
-	rowOut.setValue(MDL_SHIFT_Y, -bestTy2[Idx2[0]]);
+	rowOut.setValue(MDL_ANGLE_PSI, realWRAP(-bestPsi2[Idx2[0]], -180., 180.));
+	rowOut.setValue(MDL_SHIFT_X, bestTx2[Idx2[0]]);
+	rowOut.setValue(MDL_SHIFT_Y, bestTy2[Idx2[0]]);
 
 
 }
@@ -1763,10 +1765,10 @@ std::cout<<"size of ccMatrixShift in bestCand:"<<YSIZE(ccMatrixShift)<<"x"<<XSIZ
 
 		maxByColumn(ccMatrixShift, ccVectorTx); // ccvMatrix to ccVector
 		getShift(ccVectorTx, tx, XSIZE(ccMatrixShift));
-		tx = -1. * tx;
+//		tx = 1. * tx;
 		maxByRow(ccMatrixShift, ccVectorTy); // ccvMatrix to ccVector
 		getShift(ccVectorTy, ty, YSIZE(ccMatrixShift));
-		ty = -1. * ty;
+//		ty = 1. * ty;
 
 		if (std::abs(tx) > maxShift || std::abs(ty) > maxShift)
 			continue;
@@ -1776,10 +1778,10 @@ std::cout<<"size of ccMatrixShift in bestCand:"<<YSIZE(ccMatrixShift)<<"x"<<XSIZ
 		double expTy;
 		double expPsi;
 		expPsi = -rotVar;
-		expTx = -tx;
-		expTy = -ty;
+//		expTx = tx;
+//		expTy = ty;
 		// applying in one transform
-		applyShiftAndRotation(MDaIn, expPsi, expTx, expTy, MDaInShiftRot);
+		applyShiftAndRotation(MDaIn, expPsi, tx, ty, MDaInShiftRot);
 
 		circularWindow(MDaInShiftRot); //circular masked MDaInRotShift
 
@@ -1790,9 +1792,9 @@ std::cout<<"size of ccMatrixShift in bestCand:"<<YSIZE(ccMatrixShift)<<"x"<<XSIZ
 		//		imZNCC(MDaRef, MDaInShiftRot, tempCoeff); // IMZNCC
 		if (tempCoeff > bestCoeff) {
 			bestCoeff = tempCoeff;
-			shift_x = -expTx; //negative because in second loop,when used, this parameters are applied to mdaRef
-			shift_y = -expTy;
-			psi = -expPsi;
+			shift_x = tx;
+			shift_y = ty;
+			psi = expPsi;
 		}
 	}
 }
